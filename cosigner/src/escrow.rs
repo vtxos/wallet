@@ -1360,7 +1360,7 @@ pub async fn handle_service_message<A: AspApi, F: FetchEvidence>(
     let about = message.correlation_id();
     // Kinds, never bodies: a pairing half in a log is a pairing given away, and the same rule
     // applies to everything that travels beside one.
-    eprintln!("a service said something on stream {stream_id} (kind {})", message.kind());
+    println!("a service said something on stream {stream_id} (kind {})", message.kind());
 
     match dispatch(wallet, stream_id, message, asp, fetcher).await {
         Ok(reply) => reply.encode(),

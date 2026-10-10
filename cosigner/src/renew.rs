@@ -155,7 +155,7 @@ impl Cosigner {
         if let Some(other) =
             ark::client::batch::foreign_batch_id(&event, |id| !joined.is_empty() && joined == id)
         {
-            eprintln!("ignoring event for foreign batch {other}");
+            println!("ignoring event for foreign batch {other}");
             return Ok(RenewStep::Idle);
         }
 

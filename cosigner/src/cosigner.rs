@@ -411,7 +411,11 @@ impl Cosigner {
         let outcome = match task {
             Task::SettleDue { deadline_secs } => self.settle_due(deadline_secs, asp).await?,
         };
-        serde_json::to_vec(&outcome).map_err(|e| format!("encode outcome: {e}"))
+        let encoded = serde_json::to_vec(&outcome).map_err(|e| format!("encode outcome: {e}"))?;
+        // The watch runs unattended, so its outcome (NothingToSettle / NotDue / Settled / Woke, with
+        // its ids) is the one line that says what a background wake-up did. It names no secret.
+        println!("settle-due: {}", String::from_utf8_lossy(&encoded));
+        Ok(encoded)
     }
 
     async fn settle_due<A: AspApi>(
@@ -669,7 +673,7 @@ impl Cosigner {
             };
 
         let now = crate::store::now_secs();
-        eprintln!("Recover: returning the dealt share to the wallet's own identifier");
+        println!("Recover: returning the dealt share to the wallet's own identifier");
         Ok(crate::session::proto::RecoverResponse {
             dealt_share,
             public_key_package_json,

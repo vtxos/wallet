@@ -316,7 +316,7 @@ pub(crate) fn restore_snapshot(
     actor
         .restore_snapshot(&blob)
         .map_err(|e| format!("sealed_state/{group_key}: {e}"))?;
-    eprintln!("restored actor snapshot for {group_key}");
+    println!("restored actor snapshot for {group_key}");
     Ok(true)
 }
 
