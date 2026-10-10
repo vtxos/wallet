@@ -63,9 +63,10 @@ interface connection {
     /// customer's connection from another's, nor tell which of them a message
     /// sent to it belonged to, since that arrives as a request of its own.
     ///
-    /// `origin` must be one the image allows, exactly as an outgoing request
-    /// must. A guest cannot reach further by asking the runtime to hold the
-    /// connection than by making the request itself.
+    /// `origin` is held to the rule an outgoing request is: it must resolve to
+    /// an address a guest may reach, every time it is dialled. A guest cannot
+    /// reach further by asking the runtime to hold the connection than by
+    /// making the request itself.
     stream-open: func(id: string, origin: string) -> result<_, string>;
 
     /// Stop maintaining it and forget the record. Idempotent.
