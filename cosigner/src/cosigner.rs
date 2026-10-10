@@ -552,7 +552,7 @@ impl Cosigner {
     /// Seal this cosigner's state, logging a failure rather than returning it.
     pub fn seal(&mut self) {
         if let Err(e) = self.try_seal() {
-            tracing::warn!("{e}");
+            eprintln!("{e}");
         }
     }
 
@@ -669,7 +669,7 @@ impl Cosigner {
             };
 
         let now = crate::store::now_secs();
-        tracing::info!("Recover: returning the dealt share to the wallet's own identifier");
+        eprintln!("Recover: returning the dealt share to the wallet's own identifier");
         Ok(crate::session::proto::RecoverResponse {
             dealt_share,
             public_key_package_json,
@@ -877,7 +877,7 @@ impl Cosigner {
         self.escrow_mut(escrow_key)?.record_release(reference, record)?;
         if let Err(e) = self.try_seal() {
             if let Err(undo) = self.restore_snapshot(&before) {
-                tracing::error!("rolling back an unsealed release failed too: {undo}");
+                eprintln!("rolling back an unsealed release failed too: {undo}");
             }
             return Err(format!(
                 "this release could not be written down, so it was not signed: {e}"

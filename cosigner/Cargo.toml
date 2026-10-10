@@ -24,7 +24,6 @@ bytes = "1"
 http = "1"
 http-body = "1"
 http-body-util = "0.1"
-tracing = "0.1"
 
 # Serialization
 serde = { version = "1", features = ["derive"] }

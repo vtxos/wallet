@@ -1360,7 +1360,7 @@ pub async fn handle_service_message<A: AspApi, F: FetchEvidence>(
     let about = message.correlation_id();
     // Kinds, never bodies: a pairing half in a log is a pairing given away, and the same rule
     // applies to everything that travels beside one.
-    tracing::debug!(stream = %stream_id, kind = message.kind(), "a service said something");
+    eprintln!("a service said something on stream {stream_id} (kind {})", message.kind());
 
     match dispatch(wallet, stream_id, message, asp, fetcher).await {
         Ok(reply) => reply.encode(),
@@ -1406,11 +1406,8 @@ async fn dispatch<A: AspApi, F: FetchEvidence>(
                 .verify_sender(stream_id, &attempt_id)?;
             // Nothing to undo: the pairing is `pending`, which is already "not usable", and the
             // wallet sets up a new escrow.
-            tracing::info!(
-                escrow = %escrow_key,
-                attempt = %attempt_id,
-                %reason,
-                "a service refused a pairing half"
+            eprintln!(
+                "a service refused a pairing half: escrow={escrow_key} attempt={attempt_id} reason={reason}"
             );
             Ok(ToService::Ack { about: attempt_id })
         }

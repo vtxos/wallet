@@ -235,7 +235,7 @@ async fn sign(
     let key = lock(&cosigner).signing_key().map_err(Status::internal)?;
     let (signing, commitments) = SigningSession::begin(key, &messages);
 
-    tracing::info!("Sign: returned the dealt share to the wallet's own identifier");
+    eprintln!("Sign: returned the dealt share to the wallet's own identifier");
     duplex.send(SignServerMsg {
         session_id: session_id.clone(),
         seq: 1,
@@ -970,7 +970,7 @@ async fn renew(
     // stream sends, whichever path sends them, and gone after: a renewal signs two or three rounds
     // and the wallet rebuilds its share once.
     let mut dealt = Some(lock(&cosigner).dealt_share_for(&open.identifier)?);
-    tracing::info!("Renew: returning the dealt share to the wallet's own identifier");
+    eprintln!("Renew: returning the dealt share to the wallet's own identifier");
 
     let info = open
         .ark_info
@@ -1008,7 +1008,7 @@ async fn board(
 
     // The wallet's half of its own share, as `renew` hands it out: with the first sighashes.
     let dealt = lock(&cosigner).dealt_share_for(&open.identifier)?;
-    tracing::info!("Board: returning the dealt share to the wallet's own identifier");
+    eprintln!("Board: returning the dealt share to the wallet's own identifier");
 
     let info = open
         .ark_info

@@ -94,9 +94,8 @@ impl OnboardingSession {
         self.receiver_identifiers.iter().cloned().collect()
     }
 
-    #[tracing::instrument(skip_all, name = "dkg::open")]
     pub fn begin(&mut self, req: DkgStep1Request) -> Result<DkgStep1Response, Status> {
-        tracing::info!(
+        eprintln!(
             "DKG open from {}",
             hex::encode(&req.identifier)
         );
@@ -105,7 +104,7 @@ impl OnboardingSession {
         let id = Identifier::try_from(req.identifier.as_slice())
             .map_err(|e| Status::internal(format!("bad identifier: {e}")))?;
         if req.round1_package.is_empty() {
-            tracing::info!("DKG: registered passive receiver");
+            eprintln!("DKG: registered passive receiver");
             self.receiver_identifiers.insert(id);
         } else {
             let pkg = Round1Package::from_json(&req.round1_package)
@@ -115,7 +114,7 @@ impl OnboardingSession {
 
         // Server self-init (first caller only): deal our own round1 package.
         if self.round1_secret.is_none() {
-            tracing::info!("Server: generating onboarding secrets");
+            eprintln!("Server: generating onboarding secrets");
             let secret = random::mod_n_random(&mut OsRng);
             let mut rng = OsRng;
             let mut seed = [0u8; 32];
@@ -151,7 +150,6 @@ impl OnboardingSession {
         })
     }
 
-    #[tracing::instrument(skip_all, name = "dkg::finish")]
     pub fn finalise(&mut self, req: DkgStep3Request) -> Result<DkgStep3Response, Status> {
         // The cosigner's own round-2 packages, from everybody's round 1. This was `DKGStep2`, a
         // whole round of its own — and it returned the round-1 packages the previous call had
@@ -162,7 +160,7 @@ impl OnboardingSession {
         }
 
         if self.is_round2_local_empty() {
-            tracing::info!("DKG: computing round 2");
+            eprintln!("DKG: computing round 2");
             let Some(server_id) = self.server_id.clone() else {
                 return Err(Status::internal("server ID not initialized"));
                 };
@@ -183,7 +181,7 @@ impl OnboardingSession {
         }
         let sender_id = Identifier::try_from(req.identifier.as_slice())
             .map_err(|e| Status::internal(format!("bad identifier: {e}")))?;
-        tracing::info!(
+        eprintln!(
             "DKG finish from {}",
             hex::encode(&req.identifier)
         );
@@ -218,7 +216,7 @@ impl OnboardingSession {
 
         // Finalize: derive the group key V, persist the policy + the member→group index.
         let finalized = (|| -> Result<(), Status> {
-            tracing::info!("DKG: computing KeyPackage");
+            eprintln!("DKG: computing KeyPackage");
 
             // 2-of-2 {wallet, cosigner}: the wallet is the only non-server dealer.
             let wallet_id = self
@@ -274,7 +272,7 @@ impl OnboardingSession {
             self.public_key_package_json = Some(pkp_json);
             self.group_key = Some(group_key.clone());
 
-            tracing::info!("Onboarding complete; cosigner_id (group key)={group_key}");
+            eprintln!("Onboarding complete; cosigner_id (group key)={group_key}");
             Ok(())
         })();
         finalized?;
