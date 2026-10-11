@@ -118,11 +118,11 @@ String origin(String host, {DevEnclaveConfig dev = DevEnclaveConfig.fromDefines}
 /// Where [host]'s deployment publishes what its enclave must attest to, or null for a host that
 /// publishes to the release manifest instead.
 ///
-/// The MutinyNet host is an emulated enclave: it mints its attestation root at every boot and
-/// publishes it here with its measurements, from infrastructure/mutinynet-qemu.
+/// The MutinyNet host is a Nitro enclave deployed from vtxos/merlin-infra, which publishes
+/// each release's measurements here. No trust root: its documents chain to AWS's.
 Uri? pinsUrl(String host) => switch (host) {
-      'mutiny.vtxos.network' =>
-        Uri.parse('https://vtxos-mutinynet-enclave.s3.amazonaws.com/pins/deployment.json'),
+      'mutiny.vtxos.network' => Uri.parse(
+          'https://merlin-mutinynet-artifacts.s3.us-east-1.amazonaws.com/pins/deployment.json'),
       _ => null,
     };
 
@@ -170,9 +170,13 @@ final threshold.Identifier platformIdentifier =
 
 /// Where [host]'s payout platform answers, or null where there is none — and then sending to banks
 /// is not offered. Local: MerlinPlatform beside the dev enclave and the ASP, reached the same way.
-///
-/// ponytail: no platform for MutinyNet or production yet; add its URL here when one runs.
-Uri? platformBase(String host) => isLocalHost(host) ? Uri.parse('http://$host:7200') : null;
+/// MutinyNet: beside its enclave, on :8443 — the origin the enclave names for it, so the app and
+/// the cosigner reach the same platform.
+Uri? platformBase(String host) => switch (host) {
+      _ when isLocalHost(host) => Uri.parse('http://$host:7200'),
+      'mutiny.vtxos.network' => Uri.parse('https://mutiny.vtxos.network:8443'),
+      _ => null,
+    };
 
 /// Grid as [host]'s enclave reaches it: where every sealed payout policy must fetch its evidence.
 /// Pinned per environment and never taken from the platform — see `checkPayoutPolicy`.

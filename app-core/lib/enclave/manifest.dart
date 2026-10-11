@@ -4,9 +4,9 @@
 /// PCR16. The app pins both — PCR0 alone says which runtime, not which guest that runtime is
 /// serving.
 ///
-/// An emulated enclave (the MutinyNet host) also publishes `trust_root`: the root its attestation
-/// documents chain to, which it mints at every boot, and `host`, the name it serves. Real Nitro
-/// publishes neither; its root is AWS's.
+/// It may name `host`, the name it serves, and `rp_id`, the relying party its passkeys are for. An
+/// emulated enclave also publishes `trust_root`: the root its attestation documents chain to, which
+/// it mints at every boot. Real Nitro — the MutinyNet host — publishes none; its root is AWS's.
 library;
 
 import 'dart:convert';
@@ -82,7 +82,7 @@ Future<DeploymentManifest> fetchManifestFrom(Uri url, {http.Client? client}) asy
 
 /// Fetch the deployment manifest from GitHub Releases.
 ///
-/// [repo] - GitHub repo (e.g. "BitspendPayment/MPCWallet")
+/// [repo] - GitHub repo (e.g. "vtxos/wallet")
 /// [tag] - Release tag (e.g. "eif-latest")
 Future<DeploymentManifest> fetchManifest(String repo,
     {String tag = 'eif-latest'}) async {
