@@ -32,13 +32,4 @@ world cosigner {
     // keeps the connection; each message the service sends becomes one invocation of `on-message`,
     // exactly as a due task becomes one invocation of `run-task`.
     include enclave:streams/streaming@0.1.0;
-
-    // Spans to X-Ray and metrics to CloudWatch, attributed by the runtime to the tenant this
-    // invocation runs for.
-    //
-    // Free until it is called. An interface the code never calls is not an import of the built
-    // component — checked with `wasm-tools component wit` on the release build, whose imports were
-    // identical with and without this line — so the cosigner still instantiates on a runtime
-    // without telemetry, and only starts to need one from its first call.
-    include enclave:telemetry/observed@0.1.0;
 }
