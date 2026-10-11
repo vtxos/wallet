@@ -68,8 +68,10 @@ impl Session {
         // it. Run it without a gate and anyone can call this.
         let path = req.uri().path().to_string();
         let Some(method) = path.strip_prefix(PREFIX) else {
+            eprintln!("request to unknown service: {path}");
             return grpc::failed(Status::unimplemented(format!("no such service: {path}")));
         };
+        println!("{method}: request");
 
         // --- The ceremonies ---------------------------------------------------------------------
         //
@@ -79,8 +81,21 @@ impl Session {
             ($handler:path) => {{
                 let cosigner = Arc::clone(&self.cosigner);
                 let inbound = req.into_body().into_boxed_body();
-                return grpc::streaming(SessionBody::new(inbound, move |duplex| {
-                    $handler(cosigner, duplex)
+                // The handler runs as the response streams, so its outcome is known later than the
+                // `request` line above. Logging the end here, with the method, leaves every ceremony
+                // a start/end pair; the handler itself adds the ids beyond the method name.
+                let op = method.to_string();
+                return grpc::streaming(SessionBody::new(inbound, move |duplex| async move {
+                    match $handler(cosigner, duplex).await {
+                        Ok(()) => {
+                            println!("{op}: done");
+                            Ok(())
+                        }
+                        Err(status) => {
+                            eprintln!("{op}: failed: {status}");
+                            Err(status)
+                        }
+                    }
                 }));
             }};
         }
@@ -100,8 +115,14 @@ impl Session {
         macro_rules! unary {
             ($body:expr) => {
                 match $body.await {
-                    Ok(resp) => grpc::unary(resp),
-                    Err(status) => grpc::failed(status),
+                    Ok(resp) => {
+                        println!("{method}: done");
+                        grpc::unary(resp)
+                    }
+                    Err(status) => {
+                        eprintln!("{method}: failed: {status}");
+                        grpc::failed(status)
+                    }
                 }
             };
         }
@@ -113,7 +134,10 @@ impl Session {
             "DeviceCount" => unary!(self.device_count(body)),
             "Recover" => unary!(self.recover(body)),
             "EscrowList" => unary!(self.escrow_list(body)),
-            other => grpc::failed(Status::unimplemented(format!("no such method: {other}"))),
+            other => {
+                eprintln!("{other}: no such method");
+                grpc::failed(Status::unimplemented(format!("no such method: {other}")))
+            }
         }
     }
 
@@ -235,7 +259,7 @@ async fn sign(
     let key = lock(&cosigner).signing_key().map_err(Status::internal)?;
     let (signing, commitments) = SigningSession::begin(key, &messages);
 
-    tracing::info!("Sign: returned the dealt share to the wallet's own identifier");
+    println!("Sign: returned the dealt share to the wallet's own identifier");
     duplex.send(SignServerMsg {
         session_id: session_id.clone(),
         seq: 1,
@@ -970,7 +994,7 @@ async fn renew(
     // stream sends, whichever path sends them, and gone after: a renewal signs two or three rounds
     // and the wallet rebuilds its share once.
     let mut dealt = Some(lock(&cosigner).dealt_share_for(&open.identifier)?);
-    tracing::info!("Renew: returning the dealt share to the wallet's own identifier");
+    println!("Renew: returning the dealt share to the wallet's own identifier");
 
     let info = open
         .ark_info
@@ -1008,7 +1032,7 @@ async fn board(
 
     // The wallet's half of its own share, as `renew` hands it out: with the first sighashes.
     let dealt = lock(&cosigner).dealt_share_for(&open.identifier)?;
-    tracing::info!("Board: returning the dealt share to the wallet's own identifier");
+    println!("Board: returning the dealt share to the wallet's own identifier");
 
     let info = open
         .ark_info

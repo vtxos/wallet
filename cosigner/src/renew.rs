@@ -155,7 +155,7 @@ impl Cosigner {
         if let Some(other) =
             ark::client::batch::foreign_batch_id(&event, |id| !joined.is_empty() && joined == id)
         {
-            tracing::debug!("ignoring event for foreign batch {other}");
+            println!("ignoring event for foreign batch {other}");
             return Ok(RenewStep::Idle);
         }
 
@@ -448,7 +448,7 @@ impl DelegateRenew {
                 let outpoint = format!("{}:{}", v.txid, v.vout);
                 match exit::build_exit_tx(asp, owner, network, &input, &destination) {
                     Ok(spend) => exits.push((outpoint, spend)),
-                    Err(e) => tracing::debug!(%outpoint, "no exit: {e}"),
+                    Err(e) => eprintln!("no exit for {outpoint}: {e}"),
                 }
             }
         }

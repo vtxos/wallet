@@ -98,7 +98,7 @@ class MpcService extends ChangeNotifier {
 
   /// Where a remote enclave's measurements are published, for a host with no pins URL of its own
   /// (`server_host.pinsUrl`).
-  static const String _manifestRepo = 'BitspendPayment/MerlinWallet';
+  static const String _manifestRepo = 'vtxos/wallet';
   static const String _manifestTag = 'eif-latest';
 
   /// What a remote host's enclave must attest to, from the deployment manifest. Local hosts are a

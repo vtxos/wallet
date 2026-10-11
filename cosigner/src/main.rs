@@ -30,7 +30,10 @@ async fn main(req: Request<Body>) -> Result<Response<Body>, wstd::http::Error> {
         // A failure to open the wallet at all is still a gRPC call that has to answer. Reporting it
         // in the trailers rather than as an HTTP error is what lets a client tell "this wallet is
         // misconfigured" from "the runtime could not reach the guest".
-        Err(status) => grpc::failed(status),
+        Err(status) => {
+            eprintln!("request failed before routing: {status}");
+            grpc::failed(status)
+        }
     })
 }
 
@@ -188,15 +191,19 @@ mod runtime {
             // The runtime records a failed run's error inside the sealed task record, where nobody
             // reads it; stderr reaches the console. Said here too, so a watch that keeps failing
             // says why.
+            println!("run-task {task_id}: start");
             let run = || {
                 let cfg = cosigner::config::Config::from_environment();
                 let mut wallet = super::open_cosigner(&cfg).map_err(|e| e.to_string())?;
                 // The ASP, when the settings name one — a due delegate is then run here, not handed
                 // back to a phone.
                 let mut asp = cosigner::asp::rest::AspRest::from_env();
+                println!("run-task {task_id}: asp={}", if asp.is_some() { "yes" } else { "no" });
                 wstd::runtime::block_on(wallet.run_task_with(&task_id, &payload, asp.as_mut()))
             };
-            run().inspect_err(|e| eprintln!("background task {task_id} failed: {e}"))
+            run()
+                .inspect(|_| println!("run-task {task_id}: done"))
+                .inspect_err(|e| eprintln!("background task {task_id} failed: {e}"))
         }
 
         /// One message from an escrow service, as one invocation.
@@ -218,6 +225,7 @@ mod runtime {
             _message_id: String,
             payload: Vec<u8>,
         ) -> Result<Vec<u8>, String> {
+            println!("on-message {id}: start");
             let run = || {
                 let cfg = cosigner::config::Config::from_environment();
                 let mut wallet = super::open_cosigner(&cfg).map_err(|e| e.to_string())?;
@@ -232,7 +240,9 @@ mod runtime {
             };
             // The body is never logged: a pairing half travels on this connection, and so does
             // everything beside one. The id says which conversation, and nothing about it.
-            run().inspect_err(|e| eprintln!("a message on {id} could not be handled: {e}"))
+            run()
+                .inspect(|_| println!("on-message {id}: done"))
+                .inspect_err(|e| eprintln!("a message on {id} could not be handled: {e}"))
         }
     }
 
