@@ -125,13 +125,17 @@ ENCLAVE_RUNTIME ?= $(if $(wildcard $(CURDIR)/.enclave/image.env),$(CURDIR)/.encl
 ENCLAVE_CHECKOUT ?= $(if $(filter $(CURDIR)/.enclave,$(ENCLAVE_RUNTIME)),$(HOME)/enclave-runtime,$(ENCLAVE_RUNTIME))
 ENCLAVE_RUN     ?=
 E2E_TIMEOUT     ?= 30m
+# The emulated enclave's pool disk. The runtime gives every tenant its own ZFS pool in a fixed
+# 200 MiB region of it, and the bundle's default 4 GiB holds about 17. This suite enrols about 30,
+# so the rest were refused. The image is sparse, so the size costs nothing until it is written.
+E2E_ZFS_SIZE    ?= 16G
 # CI builds the FFI once, in its own job, and hands the library over; it sets this empty.
 FFI_DEP         ?= ffi-build
 
 e2e-enclave: cosigner-wasm $(FFI_DEP) arkd-up bitcoin-init arkd-init
 	@echo "Running the Ark E2E suite against the enclave$(if $(ENCLAVE_RUN), at $(ENCLAVE_RUN), booting one)..."
 	cd e2e && dart pub get && \
-		ENCLAVE_RUNTIME=$(ENCLAVE_RUNTIME) MERLIN_ENCLAVE_RUN=$(ENCLAVE_RUN) \
+		ENCLAVE_RUNTIME=$(ENCLAVE_RUNTIME) MERLIN_ENCLAVE_RUN=$(ENCLAVE_RUN) ZFS_SIZE=$(E2E_ZFS_SIZE) \
 		dart test test/enclave_ark_test.dart --timeout $(E2E_TIMEOUT) --reporter expanded
 
 # A dev environment: regtest + arkd, and the cosigner serving inside a QEMU Nitro enclave, in the
@@ -278,7 +282,7 @@ cosigner-check: wit-drift
 # bundle is the runtime's "Publish a dev enclave" workflow, with no image options: the bundle
 # carries nothing of this repository's. The e2e gives the cosigner its settings when it boots one
 # (e2e/lib/e2e_profile.dart), and the enclave measures them into PCR16 with the component.
-BUNDLE_URL ?= https://github.com/BitspendPayment/enclave-runtime/releases/download
+BUNDLE_URL ?= https://github.com/vtxos/enclave-runtime/releases/download
 
 enclave-bundle: .enclave/image.env
 
