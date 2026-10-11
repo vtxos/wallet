@@ -94,9 +94,9 @@ void main() {
   });
 
   group('pinsUrl', () {
-    test('the MutinyNet host publishes its own pins, trust root included', () {
+    test('the MutinyNet host publishes its own pins', () {
       expect(pinsUrl('mutiny.vtxos.network').toString(),
-          'https://vtxos-mutinynet-enclave.s3.amazonaws.com/pins/deployment.json');
+          'https://merlin-mutinynet-artifacts.s3.us-east-1.amazonaws.com/pins/deployment.json');
     });
 
     test('any other host falls back to the release manifest', () {
@@ -118,9 +118,12 @@ void main() {
       expect(platformBase('10.0.2.2').toString(), 'http://10.0.2.2:7200');
     });
 
-    /// No platform runs for them yet, so sending to banks is not offered there.
-    test('remote deployments have none', () {
-      expect(platformBase('mutiny.vtxos.network'), isNull);
+    test('MutinyNet has one beside its enclave', () {
+      expect(platformBase('mutiny.vtxos.network').toString(), 'https://mutiny.vtxos.network:8443');
+    });
+
+    /// No platform runs for it yet, so sending to banks is not offered there.
+    test('mainnet has none', () {
       expect(platformBase('mainnet.vtxos.network'), isNull);
     });
 

@@ -27,7 +27,8 @@ import 'package:e2e/mutinynet_funder.dart';
 import 'package:hive/hive.dart';
 
 const host = 'mutiny.vtxos.network';
-final pinsUrl = Uri.parse('https://vtxos-mutinynet-enclave.s3.amazonaws.com/pins/deployment.json');
+final pinsUrl =
+    Uri.parse('https://merlin-mutinynet-artifacts.s3.us-east-1.amazonaws.com/pins/deployment.json');
 const aspHost = 'mutinynet.arkade.sh';
 const electrumHost = 'electrum.mutinynet.com';
 
@@ -36,11 +37,13 @@ late final Directory work;
 Future<EnclavePins> fetchPins() async {
   final m = await fetchManifestFrom(pinsUrl);
   if (m.host != host) throw StateError('pins are for ${m.host}, not $host');
-  final root = m.trustRoot;
-  if (root == null) throw StateError('an emulated enclave must publish its trust root');
   step('pins: pcr0 ${m.pcr0.substring(0, 16)}… pcr16 ${m.pcr16.substring(0, 16)}… '
       'commit ${m.commit}, published ${m.timestamp}');
-  return EnclavePins(trustRoot: root, pcr0: m.pcr0, pcr16: m.pcr16);
+  // Real Nitro publishes no root: its documents chain to AWS's.
+  final root = m.trustRoot;
+  return root == null
+      ? EnclavePins.aws(pcr0: m.pcr0, pcr16: m.pcr16)
+      : EnclavePins(trustRoot: root, pcr0: m.pcr0, pcr16: m.pcr16);
 }
 
 Future<({MpcClient client, EnclaveGate gate})> wallet(String name, EnclavePins pins, String rpId) async {
