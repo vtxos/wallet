@@ -278,7 +278,7 @@ cosigner-check: wit-drift
 # bundle is the runtime's "Publish a dev enclave" workflow, with no image options: the bundle
 # carries nothing of this repository's. The e2e gives the cosigner its settings when it boots one
 # (e2e/lib/e2e_profile.dart), and the enclave measures them into PCR16 with the component.
-BUNDLE_URL ?= https://github.com/BitspendPayment/enclave-runtime/releases/download
+BUNDLE_URL ?= https://github.com/vtxos/enclave-runtime/releases/download
 
 enclave-bundle: .enclave/image.env
 
