@@ -1,4 +1,4 @@
-/// The ASP's own API, `ark.v1`, generated from `third_party/cosigner/crates/ark/proto/ark/v1/`.
+/// The ASP's own API, `ark.v1`, generated from vtxos/cosigner's `crates/ark/proto/ark/v1/`.
 ///
 /// A separate entry point from `protocol.dart` on purpose. The cosigner and the ASP both define
 /// messages with names like `Vtxo` and `Outpoint`, and a flat re-export would make every use of one

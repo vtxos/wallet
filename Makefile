@@ -112,7 +112,7 @@ e2e: e2e-enclave
 #       Attaches to one already up — the developer loop, e.g. `make up-enclave` in another terminal.
 #
 # One enclave at a time: its MinIO port and vsock CID are fixed. The image's cosigner must be the
-# release third_party/cosigner is at, or the protos this suite speaks are not the ones it serves.
+# release ffi/ builds against, or the protos this suite speaks are not the ones it serves.
 DEV_ENCLAVE_IMAGE = $(shell sed -n 's/^ *image: *//p' docker-compose.enclave.yml)
 # The runtime's harness, as the image copies it into .enclave-run/ when it starts.
 ENCLAVE_RUNTIME ?= $(CURDIR)/.enclave-run/bundle
@@ -134,16 +134,15 @@ e2e-enclave: $(if $(ENCLAVE_RUN),,enclave-image) $(FFI_DEP) arkd-up bitcoin-init
 		ENCLAVE_RUNTIME=$(ENCLAVE_RUNTIME) VTXOS_ENCLAVE_RUN=$(ENCLAVE_RUN) ZFS_SIZE=$(E2E_ZFS_SIZE) \
 		dart test test/enclave_ark_test.dart --timeout $(E2E_TIMEOUT) --reporter expanded
 
-# The pinned dev enclave image, pulled, and refused unless it serves the cosigner release that
-# third_party/cosigner is at.
+# The cosigner release ffi/ builds against: the tag its Cargo.toml names for vtxos/cosigner.
+COSIGNER_RELEASE = $(shell sed -n 's|.*"https://github.com/vtxos/cosigner", tag = "\([^"]*\)".*|\1|p' ffi/Cargo.toml | sort -u)
+
+# The pinned dev enclave image, pulled, and refused unless it serves that release.
 enclave-image:
 	@docker pull -q $(DEV_ENCLAVE_IMAGE) >/dev/null 2>&1 || docker image inspect $(DEV_ENCLAVE_IMAGE) >/dev/null
 	@have="$$(docker inspect -f '{{ index .Config.Labels "org.vtxos.cosigner" }}' $(DEV_ENCLAVE_IMAGE))"; \
-	want="$$(git -C third_party/cosigner describe --tags --exact-match HEAD 2>/dev/null \
-		|| { git -C third_party/cosigner fetch -q --tags origin \
-		     && git -C third_party/cosigner describe --tags --exact-match HEAD; })"; \
-	[ "$$have" = "$$want" ] || { echo "the dev enclave image serves cosigner $$have," \
-		"but third_party/cosigner is at $${want:-no release}" >&2; exit 1; }; \
+	[ "$$have" = "$(COSIGNER_RELEASE)" ] || { echo "the dev enclave image serves cosigner $$have," \
+		"but ffi/ builds against $(or $(COSIGNER_RELEASE),no release)" >&2; exit 1; }; \
 	echo "dev enclave image: cosigner $$have"
 
 # The image's cosigner.wasm, for what boots an enclave of its own: up-enclave, mutinynet-deploy.
@@ -279,8 +278,8 @@ ffi-test:
 	cargo test --release --manifest-path ffi/Cargo.toml
 
 # The cosigner lives in vtxos/cosigner, which builds and releases cosigner.wasm. This repository
-# takes it from the dev enclave image (`make cosigner`), and its crates and protos from the
-# third_party/cosigner submodule, at the same release.
+# takes it from the dev enclave image (`make cosigner`), and its crates and protos as ffi/'s git
+# dependencies, at the same release.
 
 # ═══════════════════════════════════════════════════════════════════════════════
 #  INFRASTRUCTURE
@@ -350,14 +349,18 @@ arkd-init:
 # ~/.pub-cache/bin, which is not on PATH by default. Putting it on PATH here rather than asking
 # every caller to: an undeclared global tool is how codegen silently stops being reproducible.
 PUB_BIN := $(HOME)/.pub-cache/bin
-# The cosigner's protos, and the ASP's beside its ark crate: vtxos/cosigner, at the release the
-# dev enclave image serves.
-COSIGNER_SRC := third_party/cosigner
+# The cosigner's protos, and the ASP's beside its ark crate: from the copy of vtxos/cosigner Cargo
+# checked out for ffi/, at the commit ffi/Cargo.lock pins, so the Dart and the native library
+# cannot be built from two versions of the wire.
+COSIGNER_SRC = $(shell cargo metadata --format-version 1 --locked --manifest-path ffi/Cargo.toml \
+	| jq -r '.packages[] | select(.name == "ark") | .manifest_path' | sed 's|/crates/ark/Cargo.toml$$||')
 
 proto:
 	@command -v protoc >/dev/null || { echo "protoc not found — install protobuf-compiler"; exit 1; }
 	@test -x "$(PUB_BIN)/protoc-gen-dart" || { \
 		echo "protoc-gen-dart not found — run: dart pub global activate protoc_plugin 21.1.2"; exit 1; }
+	@test -d "$(COSIGNER_SRC)/protocol/protos" || { \
+		echo "no vtxos/cosigner checkout for ffi/ — cargo metadata could not fetch it"; exit 1; }
 	@echo "Generating Dart stubs: the cosigner's service and the ASP's..."
 	@mkdir -p protocol/lib/src/generated
 	PATH="$$PATH:$(PUB_BIN)" protoc -I $(COSIGNER_SRC)/protocol/protos \

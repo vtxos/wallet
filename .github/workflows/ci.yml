@@ -1,6 +1,7 @@
 # Four jobs. Three run on any runner: the FFI crate, every Dart package's analysis and tests, and
 # the app under Flutter. The cosigner and the crates the FFI is built on are vtxos/cosigner's, at
-# the release third_party/cosigner pins, and tested there. The fourth is the enclave e2e — the only
+# the release ffi/Cargo.toml names, and tested there; `make proto` takes its protos from the same
+# checkout. The fourth is the enclave e2e — the only
 # thing that proves the ceremonies end to end — against the dev enclave image
 # (docker-compose.enclave.yml: enclave-runtime's QEMU enclave and that cosigner release, built by
 # infra) on a hosted runner's KVM, exactly as enclave-runtime's own CI boots one. Nested
@@ -28,8 +29,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      # The cosigner's crates and protos. Only this submodule: the others are not built here.
-      - run: git submodule update --init third_party/cosigner
       - uses: dtolnay/rust-toolchain@stable
       - name: Install protoc
         run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
@@ -58,8 +57,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      # The cosigner's crates and protos. Only this submodule: the others are not built here.
-      - run: git submodule update --init third_party/cosigner
       - uses: actions/download-artifact@v4
         with:
           name: ffi
@@ -90,8 +87,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      # The cosigner's crates and protos. Only this submodule: the others are not built here.
-      - run: git submodule update --init third_party/cosigner
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
@@ -121,8 +116,6 @@ jobs:
       FFI_DEP: ""
     steps:
       - uses: actions/checkout@v4
-      # The cosigner's crates and protos. Only this submodule: the others are not built here.
-      - run: git submodule update --init third_party/cosigner
       - uses: actions/download-artifact@v4
         with:
           name: ffi

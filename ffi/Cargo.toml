@@ -8,15 +8,19 @@ name = "mpcwallet_ffi"
 crate-type = ["cdylib", "staticlib"]
 
 [dependencies]
-ark = { path = "../third_party/cosigner/crates/ark", features = ["std", "exit"] }
+# ark, threshold and enclave-client are vtxos/cosigner's, at the release the dev enclave image
+# serves: `make enclave-image` refuses an image whose cosigner is another, and `make proto` takes
+# the protos from this same checkout. Moving to a newer release is every `tag` here, then
+# `cargo update`.
+ark = { git = "https://github.com/vtxos/cosigner", tag = "v0.1.1", features = ["std", "exit"] }
 ark-core = "0.9"
 bitcoin = { version = "0.32", features = ["serde"] }
-threshold = { path = "../third_party/cosigner/crates/threshold", features = ["std"] }
+threshold = { git = "https://github.com/vtxos/cosigner", tag = "v0.1.1", features = ["std"] }
 k256 = { version = "0.13", features = ["arithmetic", "std"] }
 rand = "0.8"
 sha2 = "0.10"
 libc = "0.2"
-enclave-client = { path = "../third_party/cosigner/crates/enclave-client" }
+enclave-client = { git = "https://github.com/vtxos/cosigner", tag = "v0.1.1" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 hex = "0.4"
@@ -26,4 +30,4 @@ hex = "0.4"
 # derivation against `ark::client::address`. A dev-dependency rather than a feature on the real one:
 # `signing` drags `tonic-build` into ark's build script, and the four Android ABIs, iOS and the
 # enclave should not need `protoc` to build a library that never calls a prost type.
-ark = { path = "../third_party/cosigner/crates/ark", features = ["signing"] }
+ark = { git = "https://github.com/vtxos/cosigner", tag = "v0.1.1", features = ["signing"] }

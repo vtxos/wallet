@@ -7,11 +7,12 @@
   (the gRPC connection), `enclave/` (attested gate), `persistence/` (public state only).
 - The cosigner — the Rust `wasm32-wasip2` component enclave-runtime serves — lives in
   [vtxos/cosigner](https://github.com/vtxos/cosigner), with the crates it shares with this repo
-  (`threshold`, `ark`, `enclave-client`, `escrow-service`) and the protos. `third_party/cosigner`
-  is that repository at the release this one builds against; change the cosigner there.
-- `protocol/` shared Dart package, generated from `third_party/cosigner/protocol/protos`. Generated
-  Dart (`protocol/lib/src/generated`) is **not checked in** — run `make proto`.
-- `ffi/` the merged native library the Dart side loads (`make ffi-build`), over the submodule's
+  (`threshold`, `ark`, `enclave-client`, `escrow-service`) and the protos. This repo takes them as
+  `ffi/`'s git dependencies, at the release tag `ffi/Cargo.toml` names; change the cosigner there.
+- `protocol/` shared Dart package, generated from the cosigner's protos in the copy Cargo checked
+  out for `ffi/` (`make proto` finds it). Generated Dart (`protocol/lib/src/generated`) is **not
+  checked in** — run `make proto`.
+- `ffi/` the merged native library the Dart side loads (`make ffi-build`), over the cosigner's
   `threshold`, `ark` and `enclave-client`.
 - `e2e/` the enclave end-to-end suite and its harness; `cli/` a Dart REPL against a dev enclave;
   `infrastructure/` the MutinyNet QEMU deployment; `scripts/` what the Makefile calls.
@@ -21,7 +22,6 @@
   21.1.2`, the generator for the protobuf 3 runtime `protocol` pins);
   `make proto-check` diffs them.
 - `make ffi-build` build `ffi/target/release/libmpcwallet_ffi.so`; `app-core` tests need it.
-- `git submodule update --init third_party/cosigner` first: `make proto` and the FFI build need it.
 - `cd app-core && dart test`; `cd app && flutter analyze --no-fatal-infos && flutter test`;
   `dart analyze` in `protocol/`, `cli/`, `e2e/`. Flutter may be off PATH (`~/dev/flutter/bin`).
 - `make up-enclave` boots a dev enclave (docker regtest + arkd + QEMU from the `~/enclave-runtime`
@@ -30,7 +30,7 @@
 - The e2e starts the dev enclave image pinned by digest in `docker-compose.enclave.yml` — the
   runtime's QEMU enclave and the released cosigner in one container, built by infra
   (`dev-enclave/` there). `make enclave-image` pulls it and refuses it unless its cosigner is the
-  release `third_party/cosigner` is at. The image is generic: the cosigner's settings the suite
+  release `ffi/Cargo.toml` names. The image is generic: the cosigner's settings the suite
   needs live in `e2e/lib/e2e_profile.dart` and are given at start (`GUEST_ENV`, measured into PCR16
   with the component). `COSIGNER_WASM` serves a cosigner build of your own in it instead.
 - CI is `.github/workflows/ci.yml`; its `enclave-e2e` job runs the suite on the pinned image on a

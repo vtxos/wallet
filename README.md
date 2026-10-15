@@ -169,13 +169,12 @@ The complete development stack targets **Linux with KVM and vsock**. Install:
 - `python3`, `jq`, `curl`, `openssl`, and standard Linux shell utilities.
 - For Android: the Android SDK/ADB and NDK. The Makefile defaults to NDK `27.0.12077973`; override its build variables to match an intentional toolchain change.
 
-The cosigner is [vtxos/cosigner](https://github.com/vtxos/cosigner), which builds and releases `cosigner.wasm`; its crates (`threshold`, `ark`, `enclave-client`) and protos come in through the `third_party/cosigner` submodule, at the release this repository builds against. The enclave the e2e boots is the **dev enclave image** pinned in [`docker-compose.enclave.yml`](docker-compose.enclave.yml): [enclave-runtime](https://github.com/vtxos/enclave-runtime)'s QEMU enclave and that cosigner release in one container, built by infra. The host needs Docker, KVM and vsock, and none of Nix, cargo, wasi-sdk or a runtime checkout. From the repository root:
+The cosigner is [vtxos/cosigner](https://github.com/vtxos/cosigner), which builds and releases `cosigner.wasm`; its crates (`threshold`, `ark`, `enclave-client`) are `ffi/`'s git dependencies at the release tag `ffi/Cargo.toml` names, and `make proto` takes the protos from that same checkout, so `ffi/Cargo.lock` pins both. The enclave the e2e boots is the **dev enclave image** pinned in [`docker-compose.enclave.yml`](docker-compose.enclave.yml): [enclave-runtime](https://github.com/vtxos/enclave-runtime)'s QEMU enclave and that cosigner release in one container, built by infra. The host needs Docker, KVM and vsock, and none of Nix, cargo, wasi-sdk or a runtime checkout. From the repository root:
 
 ```bash
-git submodule update --init third_party/cosigner
 sudo modprobe vsock_loopback
 
-make enclave-image    # pull the pinned image; refused unless it serves third_party/cosigner's release
+make enclave-image    # pull the pinned image; refused unless it serves the release ffi/ builds against
 ```
 
 `make up-enclave` and runtime-side work still need a checkout (`~/enclave-runtime`, or `ENCLAVE_CHECKOUT`), since that image is built with the app's rp id and origins; it serves the image's cosigner (`make cosigner`), or `COSIGNER_WASM`, a build of your own:
@@ -273,7 +272,7 @@ make e2e-enclave ENCLAVE_RUN="$ENCLAVE_CHECKOUT/target/qemu-nitro/vtxos"
 
 An attached enclave's cosigner must also name the suite's escrow-service fixture and use a renewal margin suitable for the test timeout. The delegate test reports a skip if the deadline is too far away. The image carries nothing of this suite's: the harness gives the cosigner the settings in `e2e/lib/e2e_profile.dart` when it starts it (`GUEST_ENV`), written into the component and measured into PCR16 with it. Only one emulator stack can own the fixed MinIO port/vsock configuration at a time.
 
-CI (`.github/workflows/ci.yml`) runs the FFI's `cargo test`, every Dart package's analysis, `app-core`'s tests against the built FFI, the app's `flutter analyze` and `flutter test`, and the enclave e2e: the `enclave-e2e` job starts the dev enclave image on the runner's KVM (hosted runners have nested virtualisation; the runtime's own CI relies on the same) and runs the suite. Moving to a newer runtime or cosigner is infra's: it builds the image from its pins and prints the digest, which goes into `docker-compose.enclave.yml`, with `third_party/cosigner` moved to the same cosigner release. A change to a ceremony is still run locally before it is called done. Host tests, QEMU integration tests, Android device tests, and real Nitro validation establish different properties.
+CI (`.github/workflows/ci.yml`) runs the FFI's `cargo test`, every Dart package's analysis, `app-core`'s tests against the built FFI, the app's `flutter analyze` and `flutter test`, and the enclave e2e: the `enclave-e2e` job starts the dev enclave image on the runner's KVM (hosted runners have nested virtualisation; the runtime's own CI relies on the same) and runs the suite. Moving to a newer runtime or cosigner is infra's: it builds the image from its pins and prints the digest, which goes into `docker-compose.enclave.yml`, with the tags in `ffi/Cargo.toml` moved to the same cosigner release. A change to a ceremony is still run locally before it is called done. Host tests, QEMU integration tests, Android device tests, and real Nitro validation establish different properties.
 
 ## Repository guide
 
