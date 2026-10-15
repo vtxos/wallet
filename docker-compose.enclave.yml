@@ -7,7 +7,7 @@
 # vsock_loopback`. Dev only: the Docker socket and the host network make it root on the host.
 services:
   enclave:
-    image: ghcr.io/vtxos/dev-enclave:cosigner-v0.1.1-runtime-bf5f804
+    image: ghcr.io/vtxos/dev-enclave@sha256:8117c95be262c850a3397e824906795202d0694c9c522883430592af78a7bd86
     # The harness's QEMU, MinIO and Pebble are containers of the host's Docker, so it gets the
     # socket, and they bind-mount by host path, so ENCLAVE_DIR is mounted at its own path. Host
     # networking: the enclave serves on 127.0.0.1:8443, and the cosigner reaches arkd and the
