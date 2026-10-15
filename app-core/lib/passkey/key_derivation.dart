@@ -94,8 +94,9 @@ Future<WalletPolynomial> escrowPolynomial(Uint8List seed, Uint8List context) asy
 /// [context] is the escrow's own context — what its delta was derived under — and the attempt id
 /// together, so one attempt deals one line and a second attempt a different one. Reusing a context
 /// across two *pairings* would put two of this wallet's dealings on one slope — what
-/// `crates/threshold/src/service_poly.rs` exists to warn about — which is why the attempt id is in
-/// it, and why the cosigner refuses a confirmation naming an attempt other than the one it sealed.
+/// the cosigner's `crates/threshold/src/service_poly.rs` exists to warn about — which is why the
+/// attempt id is in it, and why the cosigner refuses a confirmation naming an attempt other than
+/// the one it sealed.
 ///
 /// The escrow's context rather than its key, because both halves are drawn before the operation
 /// begins: the operation that mints an escrow also pairs it, and reads the passkey once, before the

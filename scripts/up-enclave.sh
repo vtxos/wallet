@@ -12,9 +12,10 @@ set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 repo="$PWD"
 runtime="${ENCLAVE_RUNTIME:-$HOME/enclave-runtime}"
-name="${ENCLAVE_NAME:-merlin}"
+name="${ENCLAVE_NAME:-vtxos}"
 port="${ENCLAVE_PORT:-8443}"
-wasm="$repo/cosigner/target/wasm32-wasip2/release/cosigner.wasm"
+# The cosigner the dev enclave image carries (`make cosigner`), or COSIGNER_WASM, a build of your own.
+wasm="${COSIGNER_WASM:-$repo/.cosigner/cosigner.wasm}"
 
 # The relying party, so the phone app can register a passkey against this enclave. Android creates
 # one only for a domain whose assetlinks.json names the app — https://vtxos.com/.well-known/assetlinks.json
@@ -87,7 +88,7 @@ run="$runtime/target/qemu-nitro/$name"
 # A bundle boots as it was packed; this boot builds the image with the rp id and origins below.
 [[ ! -f "$runtime/image.env" ]] \
     || { echo "$runtime is a prebuilt bundle; up-enclave needs a checkout — set ENCLAVE_RUNTIME" >&2; exit 1; }
-[[ -f "$wasm" ]] || { echo "no component at $wasm — make cosigner-wasm" >&2; exit 1; }
+[[ -f "$wasm" ]] || { echo "no component at $wasm — make cosigner, or set COSIGNER_WASM" >&2; exit 1; }
 
 # One enclave at a time: MinIO's port and the vsock CID are fixed. Say so now, rather than after
 # minutes of image build, when the second one fails to bind.

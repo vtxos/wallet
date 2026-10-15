@@ -1,3 +1,6 @@
 [submodule "third_party/rust-sdk"]
 	path = third_party/rust-sdk
 	url = https://github.com/arkade-os/rust-sdk.git
+[submodule "third_party/cosigner"]
+	path = third_party/cosigner
+	url = https://github.com/vtxos/cosigner

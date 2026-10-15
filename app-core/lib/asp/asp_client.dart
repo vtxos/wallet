@@ -5,9 +5,9 @@
 /// *called* rather than running cannot keep a socket. So the wallet talks to the ASP itself and
 /// relays what it learns to the cosigner, which answers with what to send next.
 ///
-/// Transliterated from `crates/ark/src/client/asp_client.rs`, which is the same eleven calls in
-/// Rust. [`ElectrumClient`] is the shape this follows on the Dart side: a small client app-core
-/// owns end to end, rather than a capability borrowed from a server.
+/// Transliterated from vtxos/cosigner's `crates/ark/src/client/asp_client.rs`, which is the same
+/// eleven calls in Rust. [`ElectrumClient`] is the shape this follows on the Dart side: a small
+/// client app-core owns end to end, rather than a capability borrowed from a server.
 library;
 
 import 'package:grpc/grpc.dart';

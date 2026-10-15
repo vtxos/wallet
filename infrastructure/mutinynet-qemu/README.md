@@ -55,7 +55,7 @@ IPv4 address.
 6. **The Firebase key** at `infrastructure/mutinynet-qemu/secrets/fcm-service-account.json`. It is a
    service account JSON for project `vtxos-7afb3`, with messaging rights. Only step 2 reads it, to
    load it onto the push application; no image or bundle carries it.
-7. **The cosigner toolchain** used by `make cosigner-wasm` (wasm32-wasip2 target, wasi-sdk).
+7. **Docker**, for `make cosigner`, which takes the released cosigner out of the dev enclave image.
 
 ### 1. The state bucket (once per account; already done)
 
@@ -108,7 +108,7 @@ infrastructure/mutinynet-qemu/deploy.sh --staging
 ```
 
 `deploy.sh` then does the following:
-1. Builds `cosigner.wasm` and writes MutinyNet's settings into it — arkade's ASP and
+1. Takes the released `cosigner.wasm` (`make cosigner`) and writes MutinyNet's settings into it — arkade's ASP and
    `BITCOIN_NETWORK=mutinynet` — so the enclave measures them into PCR16 with its code.
 2. Packs the enclave image with MutinyNet's configuration: domain, relying party `vtxos.com` and
    both Android signing keys, and the push application.

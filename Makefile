@@ -18,12 +18,12 @@
 .PHONY: e2e e2e-enclave up up-enclave down down-enclave \
 	bob-up bob-down bob-send \
 	ffi-build ffi-test ffi-android ffi-android-arm32 ffi-android-x86_64 ffi-android-all \
-	runtime-build cosigner-wasm cosigner-check \
+	enclave-image cosigner \
 	regtest-up regtest-down bitcoin-init mine-loop adb-reverse \
-	runtime-run runtime-stop \
+	runtime-stop \
 	arkd-up arkd-down arkd-init db-reset \
-	proto proto-check wit-drift threshold-test enclave-bundle wasi-sdk \
-	flutter flutter-32 flutter-x86 ark-newaddress crypto-bench \
+	proto proto-check \
+	flutter flutter-32 flutter-x86 ark-newaddress \
 	stress-test load-test \
 	mutinynet-deploy mutinynet-smoke \
 	e2e-test e2e-ark-test regtest regtest-ark regtest-down \
@@ -102,27 +102,23 @@ e2e: e2e-enclave
 # Two ways to run it:
 #
 #   make e2e-enclave
-#       Boots an enclave for the run and stops it after. Minutes warm; from a bundle there is no
-#       image build at all, and a cold Nix build of one is much longer. The --timeout covers that
-#       boot, which happens in setUpAll and is otherwise held to package:test's 30-second default.
-#       Tests that do real work set their own.
+#       Starts the dev enclave image (docker-compose.enclave.yml) for the run and stops it after:
+#       enclave-runtime's QEMU enclave and the released cosigner in one container, built by infra.
+#       The --timeout covers that boot, which happens in setUpAll and is otherwise held to
+#       package:test's 30-second default. Tests that do real work set their own.
+#       COSIGNER_WASM=path serves a local cosigner build in it instead of the image's.
 #
-#   make e2e-enclave ENCLAVE_RUN=$$HOME/enclave-runtime/target/qemu-nitro/merlin
-#       Attaches to one already up — the developer loop. Start it once in another terminal:
-#         cd $$HOME/enclave-runtime && ./deploy/qemu-nitro/dev-enclave.sh \
-#           --guest $(CURDIR)/cosigner/target/wasm32-wasip2/release/cosigner.wasm --name merlin
-#       and rebuild + restart it after changing the cosigner, since the running one serves the
-#       component it booted with.
+#   make e2e-enclave ENCLAVE_RUN=$$HOME/enclave-runtime/target/qemu-nitro/vtxos
+#       Attaches to one already up — the developer loop, e.g. `make up-enclave` in another terminal.
 #
-# One enclave at a time (its MinIO port and vsock CID are fixed), and ENCLAVE_RUNTIME names the
-# runtime, as for wit-drift: a checkout, or a bundle. A bundle is what `make enclave-bundle`
-# fetches into .enclave/ — the runtime's `dev-enclave.sh --pack` output, with the harness, the
-# WIT and the container images inside it — and it needs no Nix, no cargo and no checkout to boot.
-# With one in place it is the default; the checkout at ~/enclave-runtime is the fallback.
-ENCLAVE_RUNTIME ?= $(if $(wildcard $(CURDIR)/.enclave/image.env),$(CURDIR)/.enclave,$(HOME)/enclave-runtime)
-# The interactive stack (up-enclave, cli) keeps the checkout: its image is built with the app's rp
-# id and origins, options a bundle cannot take. ENCLAVE_RUNTIME set explicitly wins here too.
-ENCLAVE_CHECKOUT ?= $(if $(filter $(CURDIR)/.enclave,$(ENCLAVE_RUNTIME)),$(HOME)/enclave-runtime,$(ENCLAVE_RUNTIME))
+# One enclave at a time: its MinIO port and vsock CID are fixed. The image's cosigner must be the
+# release third_party/cosigner is at, or the protos this suite speaks are not the ones it serves.
+DEV_ENCLAVE_IMAGE = $(shell sed -n 's/^ *image: *//p' docker-compose.enclave.yml)
+# The runtime's harness, as the image copies it into .enclave-run/ when it starts.
+ENCLAVE_RUNTIME ?= $(CURDIR)/.enclave-run/bundle
+# The interactive stack (up-enclave, cli) runs a checkout: its image is built with the app's rp id
+# and origins, which a prebuilt image cannot take.
+ENCLAVE_CHECKOUT ?= $(HOME)/enclave-runtime
 ENCLAVE_RUN     ?=
 E2E_TIMEOUT     ?= 30m
 # The emulated enclave's pool disk. The runtime gives every tenant its own ZFS pool in a fixed
@@ -132,11 +128,32 @@ E2E_ZFS_SIZE    ?= 16G
 # CI builds the FFI once, in its own job, and hands the library over; it sets this empty.
 FFI_DEP         ?= ffi-build
 
-e2e-enclave: cosigner-wasm $(FFI_DEP) arkd-up bitcoin-init arkd-init
+e2e-enclave: $(if $(ENCLAVE_RUN),,enclave-image) $(FFI_DEP) arkd-up bitcoin-init arkd-init
 	@echo "Running the Ark E2E suite against the enclave$(if $(ENCLAVE_RUN), at $(ENCLAVE_RUN), booting one)..."
 	cd e2e && dart pub get && \
-		ENCLAVE_RUNTIME=$(ENCLAVE_RUNTIME) MERLIN_ENCLAVE_RUN=$(ENCLAVE_RUN) ZFS_SIZE=$(E2E_ZFS_SIZE) \
+		ENCLAVE_RUNTIME=$(ENCLAVE_RUNTIME) VTXOS_ENCLAVE_RUN=$(ENCLAVE_RUN) ZFS_SIZE=$(E2E_ZFS_SIZE) \
 		dart test test/enclave_ark_test.dart --timeout $(E2E_TIMEOUT) --reporter expanded
+
+# The pinned dev enclave image, pulled, and refused unless it serves the cosigner release that
+# third_party/cosigner is at.
+enclave-image:
+	@docker pull -q $(DEV_ENCLAVE_IMAGE) >/dev/null 2>&1 || docker image inspect $(DEV_ENCLAVE_IMAGE) >/dev/null
+	@have="$$(docker inspect -f '{{ index .Config.Labels "org.vtxos.cosigner" }}' $(DEV_ENCLAVE_IMAGE))"; \
+	want="$$(git -C third_party/cosigner describe --tags --exact-match HEAD 2>/dev/null \
+		|| { git -C third_party/cosigner fetch -q --tags origin \
+		     && git -C third_party/cosigner describe --tags --exact-match HEAD; })"; \
+	[ "$$have" = "$$want" ] || { echo "the dev enclave image serves cosigner $$have," \
+		"but third_party/cosigner is at $${want:-no release}" >&2; exit 1; }; \
+	echo "dev enclave image: cosigner $$have"
+
+# The image's cosigner.wasm, for what boots an enclave of its own: up-enclave, mutinynet-deploy.
+cosigner: .cosigner/cosigner.wasm
+
+.cosigner/cosigner.wasm: docker-compose.enclave.yml
+	@docker pull -q $(DEV_ENCLAVE_IMAGE) >/dev/null 2>&1 || docker image inspect $(DEV_ENCLAVE_IMAGE) >/dev/null
+	@id="$$(docker create $(DEV_ENCLAVE_IMAGE))" && mkdir -p .cosigner && \
+		docker cp "$$id:/cosigner/cosigner.wasm" $@ >/dev/null && docker rm "$$id" >/dev/null
+	@echo "$@ from $(DEV_ENCLAVE_IMAGE)"
 
 # A dev environment: regtest + arkd, and the cosigner serving inside a QEMU Nitro enclave, in the
 # foreground until Ctrl-C. Everything else attaches to it:
@@ -154,11 +171,11 @@ e2e-enclave: cosigner-wasm $(FFI_DEP) arkd-up bitcoin-init arkd-init
 # The image is built with rp id vtxos.com and the app's signing-key origins, so a phone can register
 # a passkey against it; ENCLAVE_RP_ID= boots the runtime's default (enclave.test) instead. See
 # scripts/up-enclave.sh.
-ENCLAVE_NAME ?= merlin
+ENCLAVE_NAME ?= vtxos
 ENCLAVE_PORT ?= 8443
 FRESH        ?=
 
-up-enclave: cosigner-wasm ffi-build arkd-up bitcoin-init arkd-init platform-up
+up-enclave: cosigner ffi-build arkd-up bitcoin-init arkd-init platform-up
 	@ENCLAVE_RUNTIME=$(ENCLAVE_CHECKOUT) ENCLAVE_NAME=$(ENCLAVE_NAME) ENCLAVE_PORT=$(ENCLAVE_PORT) \
 		FRESH=$(FRESH) ./scripts/up-enclave.sh
 
@@ -190,7 +207,7 @@ platform-reset: platform-down
 # Send to banks and mobile money end to end on the fake Grid: the e2e enclave, the platform and
 # the wallet library the app uses. Boots its own enclave, so nothing else may hold one — and starts
 # the platform afresh, since what it held was about enclaves that are gone.
-send-walkthrough: cosigner-wasm $(FFI_DEP) platform-reset regtest-ark
+send-walkthrough: enclave-image $(FFI_DEP) platform-reset regtest-ark
 	cd e2e && dart pub get && ENCLAVE_RUNTIME=$(ENCLAVE_RUNTIME) dart run bin/send_walkthrough.dart
 
 # Bring up Bob — ark-sample wallet that acts as counter-party for the Flutter
@@ -261,51 +278,9 @@ ffi-test:
 	@echo "Running merged FFI tests..."
 	cargo test --release --manifest-path ffi/Cargo.toml
 
-# Server & cosigner
-
-# The cosigner's artifact is the component, not a native binary. `wstd::http_server` exports
-# `wasi:http/incoming-handler` and leaves `fn main` as an `unreachable!()` stub, so a host build
-# produces something that panics the moment it is run — which is why this builds the wasm.
-runtime-build: cosigner-wasm
-
-# wasm32-wasip2, exporting `wasi:http/incoming-handler`. Needs wasi-sdk to compile secp256k1-sys,
-# the one vendored C library left — see the script.
-cosigner-wasm: wit-drift
-	@./scripts/build-cosigner-wasm.sh
-
-# The host build, for `cargo test` and for rust-analyzer. Not a server: see above.
-cosigner-check: wit-drift
-	cd cosigner && cargo build --release --lib && cargo test
-
-# The prebuilt dev enclave: a release of enclave-runtime, pinned by name and sha256 in
-# enclave-bundle.lock, unpacked into .enclave/. Bumping the pin is editing that file; making a new
-# bundle is the runtime's "Publish a dev enclave" workflow, with no image options: the bundle
-# carries nothing of this repository's. The e2e gives the cosigner its settings when it boots one
-# (e2e/lib/e2e_profile.dart), and the enclave measures them into PCR16 with the component.
-BUNDLE_URL ?= https://github.com/vtxos/enclave-runtime/releases/download
-
-enclave-bundle: .enclave/image.env
-
-.enclave/image.env: enclave-bundle.lock
-	@. ./enclave-bundle.lock; \
-	[ -n "$$RELEASE" ] || { echo "enclave-bundle.lock names no release yet" >&2; exit 1; }; \
-	t=$$(mktemp); \
-	echo "fetching $$RELEASE"; \
-	curl -fL --retry 3 --retry-all-errors -o $$t "$(BUNDLE_URL)/$$RELEASE/$$RELEASE.tar.gz" && \
-	echo "$$SHA256  $$t" | sha256sum -c - && \
-	rm -rf .enclave && mkdir .enclave && tar xzf $$t -C .enclave --strip-components=1 && rm $$t && \
-	echo "unpacked into .enclave ($$(. .enclave/image.env; echo runtime $$ENCLAVE_RUNTIME_REV))"
-
-# wasi-sdk, pinned by the runtime (its scripts/wasi-sdk.sh ships in a bundle too), for cosigner-wasm.
-wasi-sdk:
-	@$(ENCLAVE_RUNTIME)/scripts/wasi-sdk.sh
-
-# The cosigner vendors enclave-runtime's tasks.wit and notify.wit because wit-bindgen reads a path
-# inside the crate. Two copies that must be byte-identical is the thing that drifts unnoticed: both
-# sides still compile and the mismatch surfaces as a runtime trap. The canonical copy is
-# ENCLAVE_RUNTIME's: the pinned bundle once fetched, else the checkout at ~/enclave-runtime.
-wit-drift:
-	@ENCLAVE_RUNTIME=$(ENCLAVE_RUNTIME) ./scripts/wit-drift.sh
+# The cosigner lives in vtxos/cosigner, which builds and releases cosigner.wasm. This repository
+# takes it from the dev enclave image (`make cosigner`), and its crates and protos from the
+# third_party/cosigner submodule, at the same release.
 
 # ═══════════════════════════════════════════════════════════════════════════════
 #  INFRASTRUCTURE
@@ -334,20 +309,6 @@ adb-reverse:
 	@echo "Forwarding active: phone 127.0.0.1:7070 -> arkd"
 	@echo "Forwarding active: phone 127.0.0.1:50001 -> Electrs"
 	@echo "Forwarding active: phone 127.0.0.1:7200 -> MerlinPlatform"
-
-# There is no native server to start any more.
-#
-# The cosigner is a wasm32-wasip2 component exporting `wasi:http/incoming-handler`: enclave-runtime
-# owns the socket, the TLS and the HTTP/2 negotiation and calls the guest once per request. Running
-# the host binary hits `wstd`'s `unreachable!()` stub instead of serving anything, so this refuses
-# rather than starting something that cannot work.
-#
-# Locally that is `make up-enclave`; on MutinyNet it is `make mutinynet-deploy`.
-runtime-run: cosigner-wasm
-	@echo "The cosigner is a Wasm component; there is no native server to run."
-	@echo "Built: cosigner/target/wasm32-wasip2/release/cosigner.wasm"
-	@echo "Serve it with enclave-runtime, which owns the socket and calls the guest per request."
-	@exit 1
 
 runtime-stop:
 	@echo "Stopping MPC Wallet Server..."
@@ -389,6 +350,9 @@ arkd-init:
 # ~/.pub-cache/bin, which is not on PATH by default. Putting it on PATH here rather than asking
 # every caller to: an undeclared global tool is how codegen silently stops being reproducible.
 PUB_BIN := $(HOME)/.pub-cache/bin
+# The cosigner's protos, and the ASP's beside its ark crate: vtxos/cosigner, at the release the
+# dev enclave image serves.
+COSIGNER_SRC := third_party/cosigner
 
 proto:
 	@command -v protoc >/dev/null || { echo "protoc not found — install protobuf-compiler"; exit 1; }
@@ -396,17 +360,16 @@ proto:
 		echo "protoc-gen-dart not found — run: dart pub global activate protoc_plugin 21.1.2"; exit 1; }
 	@echo "Generating Dart stubs: the cosigner's service and the ASP's..."
 	@mkdir -p protocol/lib/src/generated
-	PATH="$$PATH:$(PUB_BIN)" protoc -I protocol/protos \
+	PATH="$$PATH:$(PUB_BIN)" protoc -I $(COSIGNER_SRC)/protocol/protos \
 		--dart_out=grpc:protocol/lib/src/generated \
-		protocol/protos/mpc_wallet.proto protocol/protos/cosign_session.proto
-	@# The ASP's own API, generated from the Rust crate's protos rather than a copy under
-	@# protocol/protos: crates/ark/build.rs compiles from there, and a second copy is a second
-	@# source of truth that drifts without either side noticing.
-	PATH="$$PATH:$(PUB_BIN)" protoc -I crates/ark/proto \
+		$(COSIGNER_SRC)/protocol/protos/mpc_wallet.proto $(COSIGNER_SRC)/protocol/protos/cosign_session.proto
+	@# The ASP's own API, generated from the ark crate's protos rather than a copy: its build.rs
+	@# compiles from there, and a second copy is a second source of truth that drifts unnoticed.
+	PATH="$$PATH:$(PUB_BIN)" protoc -I $(COSIGNER_SRC)/crates/ark/proto \
 		--dart_out=grpc:protocol/lib/src/generated \
-		crates/ark/proto/ark/v1/types.proto \
-		crates/ark/proto/ark/v1/service.proto \
-		crates/ark/proto/ark/v1/indexer.proto
+		$(COSIGNER_SRC)/crates/ark/proto/ark/v1/types.proto \
+		$(COSIGNER_SRC)/crates/ark/proto/ark/v1/service.proto \
+		$(COSIGNER_SRC)/crates/ark/proto/ark/v1/indexer.proto
 
 # Regenerate into a scratch directory and diff. Generated code is checked in, so drift between the
 # .proto and the .dart is invisible until something fails to compile much later.
@@ -416,22 +379,18 @@ proto:
 # byte-different output from identical input.
 proto-check:
 	@tmp=$$(mktemp -d); \
-	PATH="$$PATH:$(PUB_BIN)" protoc -I protocol/protos --dart_out=grpc:$$tmp \
-		protocol/protos/mpc_wallet.proto protocol/protos/cosign_session.proto && \
-	PATH="$$PATH:$(PUB_BIN)" protoc -I crates/ark/proto --dart_out=grpc:$$tmp \
-		crates/ark/proto/ark/v1/types.proto \
-		crates/ark/proto/ark/v1/service.proto \
-		crates/ark/proto/ark/v1/indexer.proto && \
+	PATH="$$PATH:$(PUB_BIN)" protoc -I $(COSIGNER_SRC)/protocol/protos --dart_out=grpc:$$tmp \
+		$(COSIGNER_SRC)/protocol/protos/mpc_wallet.proto $(COSIGNER_SRC)/protocol/protos/cosign_session.proto && \
+	PATH="$$PATH:$(PUB_BIN)" protoc -I $(COSIGNER_SRC)/crates/ark/proto --dart_out=grpc:$$tmp \
+		$(COSIGNER_SRC)/crates/ark/proto/ark/v1/types.proto \
+		$(COSIGNER_SRC)/crates/ark/proto/ark/v1/service.proto \
+		$(COSIGNER_SRC)/crates/ark/proto/ark/v1/indexer.proto && \
 	if diff -r -q "$$tmp" protocol/lib/src/generated >/dev/null 2>&1; then \
 		echo "ok     generated Dart matches the .proto files"; rm -rf "$$tmp"; \
 	else \
 		echo "DRIFT  generated Dart differs from the .proto files — run 'make proto'" >&2; \
 		diff -r "$$tmp" protocol/lib/src/generated || true; rm -rf "$$tmp"; exit 1; \
 	fi
-
-threshold-test:
-	@echo "Running threshold tests..."
-	cd crates/threshold && cargo test --features std
 
 # The app against a dev enclave: its per-boot trust root, Pebble root and PCRs go in as
 # --dart-define, since a dev enclave mints new ones every boot. Rebuild after restarting it.
@@ -453,10 +412,6 @@ flutter-x86: ffi-android-x86_64
 
 ark-newaddress:
 	@cd e2e && dart run bin/ark_newaddress.dart
-
-crypto-bench:
-	@echo "Running Rust cryptography benchmarks..."
-	cd crates/threshold && cargo bench
 
 # ═══════════════════════════════════════════════════════════════════════════════
 #  STRESS / LOAD TESTING
@@ -505,12 +460,12 @@ mutinynet-smoke: ffi-build
 #   make cli                                       the REPL
 #   make cli ARGS="fund 100000"                    one command
 #   make cli ENCLAVE_RUN=/path/to/qemu-nitro/<name>
-CLI_ENCLAVE_RUN ?= $(ENCLAVE_CHECKOUT)/target/qemu-nitro/merlin
+CLI_ENCLAVE_RUN ?= $(ENCLAVE_CHECKOUT)/target/qemu-nitro/$(ENCLAVE_NAME)
 ARGS ?=
 
 cli: ffi-build
 	cd cli && dart pub get >/dev/null && \
-		MERLIN_ENCLAVE_RUN=$(or $(ENCLAVE_RUN),$(CLI_ENCLAVE_RUN)) ENCLAVE_RUNTIME=$(ENCLAVE_CHECKOUT) \
+		VTXOS_ENCLAVE_RUN=$(or $(ENCLAVE_RUN),$(CLI_ENCLAVE_RUN)) ENCLAVE_RUNTIME=$(ENCLAVE_CHECKOUT) \
 		dart run bin/merlin.dart $(ARGS)
 
 # Analyze without running — what CI would check.

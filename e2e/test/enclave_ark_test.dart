@@ -9,9 +9,9 @@
 /// without one.
 ///
 /// ```console
-/// $ make cosigner-wasm
+/// $ make enclave-image                                   # the pinned dev enclave image
 /// $ dart test test/enclave_ark_test.dart                    # boots an enclave, ~minutes
-/// $ MERLIN_ENCLAVE_RUN=~/enclave-runtime/target/qemu-nitro/merlin dart test …   # attaches
+/// $ VTXOS_ENCLAVE_RUN=~/enclave-runtime/target/qemu-nitro/vtxos dart test …   # attaches
 /// ```
 library;
 

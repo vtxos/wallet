@@ -70,10 +70,10 @@ say() { printf '\n== %s ==\n' "$*"; }
 out="$(mktemp -d)"
 trap 'rm -rf "$out"' EXIT
 
-say "building the cosigner"
-make -C "$repo" cosigner-wasm
+say "the cosigner"
+make -C "$repo" cosigner
 mkdir -p "$out/guest"
-cp "$repo/cosigner/target/wasm32-wasip2/release/cosigner.wasm" "$out/guest/"
+cp "$repo/.cosigner/cosigner.wasm" "$out/guest/"
 python3 "$runtime/deploy/qemu-nitro/guest-env.py" "$out/guest/cosigner.wasm" "${guest_settings[@]}"
 
 say "packing the enclave image"

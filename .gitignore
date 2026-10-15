@@ -64,8 +64,10 @@ protocol/lib/src/generated/
 # Data
 e2e/hive_db
 
-# The prebuilt dev enclave `make enclave-bundle` unpacks (hundreds of MB; pinned by enclave-bundle.lock).
-.enclave/
+# Where the dev enclave image runs its harness from, as e2e-enclave starts it (hundreds of MB).
+.enclave-run/
+# The image's cosigner.wasm, as `make cosigner` takes it out.
+.cosigner/
 # The payout platform the regtest stack runs: its build copy, state and logs. See scripts/platform.sh.
 .platform/
 

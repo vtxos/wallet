@@ -124,7 +124,7 @@ Two layered fixes, do both:
 - [cosigner-runtime/src/cosigner/handlers/ark_send.rs](cosigner-runtime/src/cosigner/handlers/ark_send.rs)
   — modify the `(Some, false)` arm; possibly add a `clear_settle_session`
   command for the UI escape hatch.
-- [protocol/protos/mpc_wallet.proto](protocol/protos/mpc_wallet.proto) — add
+- [protocol/protos/mpc_wallet.proto](https://github.com/vtxos/cosigner/blob/main/protocol/protos/mpc_wallet.proto) — add
   `rpc ClearBoardingSession` if implementing fix #2.
 - [app/lib/screens/ark/ark_board_screen.dart](app/lib/screens/ark/ark_board_screen.dart)
   — add a "Reset" button wired to the new RPC.
@@ -250,7 +250,7 @@ this entire file.
 **Status:** ✅ fixed.
 
 * Server: `rpc GetServerInfo` added to
-  [protocol/protos/mpc_wallet.proto](protocol/protos/mpc_wallet.proto);
+  [protocol/protos/mpc_wallet.proto](https://github.com/vtxos/cosigner/blob/main/protocol/protos/mpc_wallet.proto);
   unauthenticated handler in
   [cosigner-runtime/src/rest_api.rs](cosigner-runtime/src/rest_api.rs)
   serves `bitcoin_network` from `Config`.
@@ -303,7 +303,7 @@ fetches it once per session and passes it through to the wallet constructor.
 
 #### Step 1 — Proto
 
-Add to [protocol/protos/mpc_wallet.proto](protocol/protos/mpc_wallet.proto):
+Add to [protocol/protos/mpc_wallet.proto](https://github.com/vtxos/cosigner/blob/main/protocol/protos/mpc_wallet.proto):
 
 ```proto
 service MPCWallet {

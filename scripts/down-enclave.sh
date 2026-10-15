@@ -8,7 +8,7 @@
 # enclave-harness=<name>, which is what the runtime's own cleanup removes; this is that cleanup.
 set -uo pipefail
 
-name="${ENCLAVE_NAME:-merlin}"
+name="${ENCLAVE_NAME:-vtxos}"
 
 # Signal processes whose command line matches, but never a shell or make. A pattern naming the run
 # directory also matches any shell whose command mentions it — including the one running this.

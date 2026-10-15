@@ -14,7 +14,7 @@
 /// gate remembers the one it attested, and the cosigner's channel refuses a socket serving any
 /// other — see `PinnedTransportConnector`.
 ///
-/// The cryptography is Rust, in `crates/enclave-client`, reached over FFI.
+/// The cryptography is Rust, in vtxos/cosigner's `crates/enclave-client`, reached over FFI.
 library;
 
 import 'dart:convert';

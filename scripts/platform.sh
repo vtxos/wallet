@@ -7,8 +7,9 @@
 #   scripts/platform.sh pins <run>    believe the dev enclave booted in <run> (its PCRs and root)
 #
 # MerlinPlatform is a repository of its own, found at $MERLIN_PLATFORM (default ../MerlinPlatform).
-# It depends on this repository's crates by git revision; here it is built against THIS checkout's
-# instead, so the platform always speaks the protocol of the cosigner being run. That takes a
+# It depends on vtxos/cosigner's crates by release tag; here it is built against third_party/cosigner
+# instead, the release the dev enclave serves, so the platform always speaks the protocol of the
+# cosigner being run. That takes a
 # `--config patch`, which rewrites Cargo.lock — so what is built is a copy in .platform/build, and
 # the MerlinPlatform checkout is never touched.
 #
@@ -41,7 +42,7 @@ build() {
     local patch=() crate
     for crate in escrow-service=crates/escrow-service cosigner=cosigner ark=crates/ark \
                  threshold=crates/threshold; do
-        patch+=(--config "patch.\"https://github.com/BitspendPayment/MerlinWallet\".${crate%%=*}.path=\"$repo/${crate#*=}\"")
+        patch+=(--config "patch.\"https://github.com/vtxos/cosigner\".${crate%%=*}.path=\"$repo/third_party/cosigner/${crate#*=}\"")
     done
     cargo build --release --bins --manifest-path "$build/src/Cargo.toml" \
         --target-dir "$build/target" "${patch[@]}"

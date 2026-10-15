@@ -280,16 +280,16 @@ class Cli {
 
 /// Build from the environment:
 ///
-///   MERLIN_ENCLAVE_RUN  the dev enclave's run directory (default ~/enclave-runtime/target/qemu-nitro/merlin)
+///   VTXOS_ENCLAVE_RUN  the dev enclave's run directory (default ~/enclave-runtime/target/qemu-nitro/vtxos)
 ///   ENCLAVE_PORT        8443
 ///   ASP                 127.0.0.1:7070
 ///   BITCOIN_RPC_URL     http://admin1:123@127.0.0.1:18443, wallet BITCOIN_RPC_WALLET (default)
 ///   ELECTRUM            127.0.0.1:50001
 Cli fromEnvironment() {
   final env = Platform.environment;
-  final run = env['MERLIN_ENCLAVE_RUN'] ?? '${DevEnclave.defaultRuntimeRepo}/target/qemu-nitro/merlin';
+  final run = env['VTXOS_ENCLAVE_RUN'] ?? '${DevEnclave.defaultRuntimeRepo}/target/qemu-nitro/vtxos';
   if (!File('$run/trust-root.der').existsSync()) {
-    throw StateError('no dev enclave at $run — boot one with dev-enclave.sh, or set MERLIN_ENCLAVE_RUN');
+    throw StateError('no dev enclave at $run — boot one with dev-enclave.sh, or set VTXOS_ENCLAVE_RUN');
   }
   final enclave = DevEnclave(runDir: run, port: int.parse(env['ENCLAVE_PORT'] ?? '8443'));
   (String, int) hostPort(String? value, String fallback) {

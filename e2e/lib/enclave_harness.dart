@@ -3,7 +3,8 @@
 /// The cosigner is a Wasm component with no listener of its own, so a test cannot spawn it: it
 /// needs a host, and `enclave-runtime`'s own binary refuses to serve outside an enclave because it
 /// measures the guest into PCR16 before serving and that reads the Nitro Security Module. So this
-/// drives `deploy/qemu-nitro/dev-enclave.sh`, which boots the real thing under QEMU.
+/// starts the dev enclave image (`docker-compose.enclave.yml`, built by infra): enclave-runtime's
+/// `dev-enclave.sh` and the released cosigner in one container, booting the real thing under QEMU.
 ///
 /// What that buys, beyond "it runs at all":
 ///
@@ -12,15 +13,14 @@
 ///    multiplexing on a client-side `storageId` the way the old suite did.
 ///  * **The client runs its real path.** TLS, the nonce, and a WebAuthn assertion per request.
 ///
-/// Booting is slow — minutes, and much worse on a cold Nix build — and only one enclave can be up
-/// at a time because MinIO's port and the vsock CID are fixed. So [EnclaveHarness.start] will
-/// **attach to an enclave that is already running** when `MERLIN_ENCLAVE_RUN` names its run
+/// Booting is slow — minutes — and only one enclave can be up at a time because MinIO's port and
+/// the vsock CID are fixed. So [EnclaveHarness.start] will
+/// **attach to an enclave that is already running** when `VTXOS_ENCLAVE_RUN` names its run
 /// directory. That is the developer loop: leave one up in another terminal and re-run the suite
 /// against it.
 library;
 
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
 import 'dart:math' show Random;
 
@@ -30,8 +30,6 @@ import 'package:app_core/enclave/gate.dart';
 import 'package:hive/hive.dart';
 
 import 'logger.dart';
-
-String get _runtimeRepo => DevEnclave.defaultRuntimeRepo;
 
 /// One wallet: its passkey, its tenant, its client.
 class Wallet {
@@ -54,8 +52,9 @@ class EnclaveHarness {
     required this.trustRoot,
     required this.port,
     required this.attached,
-    Process? process,
-  }) : _process = process;
+    this.runtimeRepo,
+    Map<String, String>? compose,
+  }) : _compose = compose;
 
   /// `target/qemu-nitro/<name>/` — the trust root, the passkey state files, the console log and
   /// every wake the guest raised.
@@ -82,26 +81,33 @@ class EnclaveHarness {
       .map((b) => b.toRadixString(16).padLeft(2, '0'))
       .join();
 
-  final Process? _process;
+  /// The runtime whose passkey client enrols here: the image's copy of it, when we started one.
+  final String? runtimeRepo;
 
-  late final DevEnclave enclave =
-      DevEnclave(runDir: runDir, port: port, pcr0: pcr0, pcr16: pcr16);
+  /// `docker compose`'s environment, when we started the enclave and so must stop it.
+  final Map<String, String>? _compose;
 
-  /// Attach to a running enclave, or boot one.
+  late final DevEnclave enclave = DevEnclave(
+      runDir: runDir, port: port, pcr0: pcr0, pcr16: pcr16, runtimeRepo: runtimeRepo);
+
+  /// The repository, from `e2e/`, where the suite runs.
+  static String get _repo => Directory.current.parent.path;
+  static String get _composeFile => '$_repo/docker-compose.enclave.yml';
+
+  /// Attach to a running enclave, or start the dev enclave image.
   ///
-  /// [component] defaults to the release component `make cosigner-wasm` writes.
+  /// [component] serves another cosigner build than the image's (as does `COSIGNER_WASM`).
   /// [settings] are the cosigner's, as `NAME=VALUE`: written into the component as it is uploaded,
   /// so the enclave measures them into PCR16 with its code. Among them `SERVICE_ORIGINS`, the
   /// escrow services it may pair with — a wallet names a service *id* and never a URL — which is
   /// decided before the enclave boots, so a test that pairs starts its service on a known port.
   static Future<EnclaveHarness> start({
-    String name = 'merlin',
-    int port = 8443,
     String? component,
     Map<String, String> settings = const {},
-    Duration timeout = const Duration(minutes: 20),
+    Duration timeout = const Duration(minutes: 30),
   }) async {
-    final existing = Platform.environment['MERLIN_ENCLAVE_RUN'];
+    const port = 8443;
+    final existing = Platform.environment['VTXOS_ENCLAVE_RUN'];
     if (existing != null && existing.isNotEmpty) {
       Log.info('attaching to the enclave at $existing');
       return EnclaveHarness._(
@@ -116,62 +122,42 @@ class EnclaveHarness {
       );
     }
 
-    final wasm = component ??
-        '${Directory.current.parent.path}/cosigner/target/wasm32-wasip2/release/cosigner.wasm';
-    if (!File(wasm).existsSync()) {
-      throw StateError('no component at $wasm — build it first: make cosigner-wasm');
+    // The container runs the harness from here, a host directory it mounts at the same path, and
+    // sees nothing else of the host: so a component of our own goes in here too.
+    final dir = '$_repo/.enclave-run';
+    await Directory(dir).create(recursive: true);
+    final wasm = component ?? Platform.environment['COSIGNER_WASM'];
+    if (wasm != null) await File(wasm).copy('$dir/guest.wasm');
+    final env = {
+      'ENCLAVE_DIR': dir,
+      'GUEST_ENV': [for (final s in settings.entries) '${s.key}=${s.value}'].join(','),
+      if (wasm != null) 'GUEST': '$dir/guest.wasm',
+    };
+
+    Log.info('starting the dev enclave${wasm != null ? ' with $wasm' : ''}');
+    final up = await Process.run(
+        'docker',
+        ['compose', '-f', _composeFile, 'up', '-d', '--wait', '--wait-timeout',
+         '${timeout.inSeconds}'],
+        environment: env);
+    if (up.exitCode != 0) {
+      final logs = await Process.run(
+          'docker', ['compose', '-f', _composeFile, 'logs', '--tail', '80'], environment: env);
+      await Process.run('docker', ['compose', '-f', _composeFile, 'down'], environment: env);
+      throw StateError('the dev enclave did not come up:\n${up.stderr}\n${logs.stdout}');
     }
 
-    // Boot options, so a bundle (`make enclave-bundle`) takes them as readily as a checkout: the
-    // image carries nothing of this suite's.
-    final guestEnv = [
-      for (final setting in settings.entries) ...['--guest-env', '${setting.key}=${setting.value}'],
-    ];
-    final bundle = DevEnclave.isBundle(_runtimeRepo);
-
-    Log.info('booting an enclave with $wasm${bundle ? ' from the bundle at $_runtimeRepo' : ''}');
-    final proc = await Process.start(
-      '$_runtimeRepo/deploy/qemu-nitro/dev-enclave.sh',
-      [
-        '--guest', wasm, '--name', name, '--port', '$port', ...guestEnv,
-        if (bundle) ...['--prebuilt', _runtimeRepo],
-      ],
-      workingDirectory: _runtimeRepo,
+    final runDir = '$dir/bundle/target/qemu-nitro/vtxos';
+    return EnclaveHarness._(
+      runDir: runDir,
+      pcr0: _fromConsole(runDir, RegExp(r'pcr0=([0-9a-f]{96})')),
+      pcr16: _fromConsole(runDir, RegExp(r'pcr16=([0-9a-f]{96})')),
+      trustRoot: '$runDir/trust-root.der',
+      port: port,
+      attached: false,
+      runtimeRepo: '$dir/bundle',
+      compose: env,
     );
-
-    // The script prints a summary block and then blocks forever; there is no `--detach` and no
-    // readiness file, so the three values a client pins are scraped from that block.
-    final ready = Completer<EnclaveHarness>();
-    final seen = StringBuffer();
-    String? pcr0, pcr16, trustRoot;
-    void consume(String chunk) {
-      seen.write(chunk);
-      Log.server(chunk.trimRight());
-      pcr0 ??= RegExp(r'--pcr0\s+([0-9a-f]{96})').firstMatch(seen.toString())?.group(1);
-      pcr16 ??= RegExp(r'--pcr16\s+([0-9a-f]{96})').firstMatch(seen.toString())?.group(1);
-      trustRoot ??= RegExp(r'--trust-root\s+(\S+)').firstMatch(seen.toString())?.group(1);
-      if (!ready.isCompleted && seen.toString().contains('Ctrl-C to stop everything')) {
-        ready.complete(EnclaveHarness._(
-          runDir: '$_runtimeRepo/target/qemu-nitro/$name',
-          pcr0: pcr0!,
-          pcr16: pcr16!,
-          trustRoot: trustRoot!,
-          port: port,
-          attached: false,
-          process: proc,
-        ));
-      }
-    }
-
-    proc.stdout.transform(utf8.decoder).listen(consume);
-    proc.stderr.transform(utf8.decoder).listen(consume);
-    unawaited(proc.exitCode.then((code) {
-      if (!ready.isCompleted) {
-        ready.completeError(StateError('the enclave exited ($code) before serving:\n$seen'));
-      }
-    }));
-
-    return ready.future.timeout(timeout);
   }
 
   /// A wallet, with its own passkey and therefore its own tenant and filesystem.
@@ -241,20 +227,15 @@ class EnclaveHarness {
 
   /// Stop what we started. An attached enclave is left running — it was not ours to stop.
   ///
-  /// The script tears down after itself on SIGINT, but not reliably: interrupting it can take out
-  /// the QEMU container before its exit trap runs, and then MinIO, Pebble, the FCM stub, gvproxy and
-  /// the vsock bridge all outlive it, still holding the fixed ports the next run needs. So after
-  /// asking nicely this sweeps what the run started. Everything it creates carries the label
-  /// `enclave-harness=<name>`, which is exactly what the script's own cleanup removes — this is that
-  /// cleanup, for when the trap did not get to run it.
+  /// `down` stops the harness, whose exit trap removes the QEMU, MinIO and Pebble containers it
+  /// started on the host's Docker. Not reliably: a trap cut short leaves them holding the fixed ports
+  /// the next run needs. Everything it creates carries the label `enclave-harness=<name>`, which is
+  /// exactly what that trap removes — so this sweeps them too, for when it did not get to.
   Future<void> stop() async {
-    if (attached || _process == null) return;
+    final env = _compose;
+    if (attached || env == null) return;
     Log.info('stopping the enclave');
-    _process.kill(ProcessSignal.sigint);
-    await _process.exitCode.timeout(const Duration(minutes: 2), onTimeout: () {
-      _process.kill(ProcessSignal.sigkill);
-      return -1;
-    });
+    await Process.run('docker', ['compose', '-f', _composeFile, 'down'], environment: env);
     await _sweep(name);
   }
 
@@ -269,11 +250,6 @@ class EnclaveHarness {
     if (containers.isNotEmpty) {
       await Process.run('docker', ['rm', '-f', ...containers]);
     }
-    // The helpers are host processes, not containers, and carry no label — but each names this
-    // run's directory on its command line, which is specific enough to match on.
-    await Process.run('pkill', ['-f', 'qemu-nitro/$name/']);
-    await Process.run('pkill', ['-f', 'push-stub.py .*qemu-nitro/$name/']);
-    await Process.run('pkill', ['-f', 'heartbeat.py 9000']);
   }
 
   /// The runtime writes its log with colour, and the escapes land between the field name and its

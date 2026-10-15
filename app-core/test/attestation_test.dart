@@ -1,5 +1,5 @@
 /// The Dart binding to the Rust verifier, against the real dev-enclave document the Rust tests use
-/// (`crates/enclave-client/tests/fixtures`). What this adds over those is the marshalling: every
+/// (`third_party/cosigner/crates/enclave-client/tests/fixtures`). What this adds over those is the marshalling: every
 /// argument crosses FFI in the right slot, and a refusal comes back as an [AttestationException]
 /// naming the check.
 library;
@@ -11,7 +11,7 @@ import 'package:convert/convert.dart';
 import 'package:test/test.dart';
 
 void main() {
-  final fixtures = '${Directory.current.parent.path}/crates/enclave-client/tests/fixtures';
+  final fixtures = '${Directory.current.parent.path}/third_party/cosigner/crates/enclave-client/tests/fixtures';
   List<int> read(String name) => File('$fixtures/$name').readAsBytesSync();
 
   final document = read('dev-document.cose');
