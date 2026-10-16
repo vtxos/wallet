@@ -55,7 +55,7 @@ If `state.settle_session` is `Some(...)` (a session was created on a previous
 attempt) **and** the client sends a request with empty `signed_messages`, this
 arm fires, parks the session back, and replies `WaitingForBatch` immediately.
 The client's loop at
-[`app-core/lib/client.dart::settle`](app-core/lib/client.dart) treats
+[`core/lib/client.dart::settle`](core/lib/client.dart) treats
 `WAITING_FOR_BATCH` as "keep polling with empty sigs":
 
 ```dart
@@ -336,7 +336,7 @@ Regenerate stubs: `make proto`.
 #### Step 3 — Dart client
 
 Add `getServerInfo()` to `MpcClient` in
-[app-core/lib/client.dart](app-core/lib/client.dart). Returns a typed
+[core/lib/client.dart](core/lib/client.dart). Returns a typed
 `ServerInfo` struct.
 
 #### Step 4 — Drop the duplicated state in MpcService

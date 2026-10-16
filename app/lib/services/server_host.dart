@@ -12,10 +12,10 @@ library;
 
 import 'dart:convert';
 
-import 'package:app_core/enclave/attestation.dart';
-import 'package:app_core/enclave/endpoint.dart';
-import 'package:app_core/sessions/service_delivery.dart';
-import 'package:app_core/threshold_types.dart' as threshold;
+import 'package:core/enclave/attestation.dart';
+import 'package:core/enclave/endpoint.dart';
+import 'package:core/sessions/service_delivery.dart';
+import 'package:core/threshold_types.dart' as threshold;
 
 /// Dev/loopback addresses: a dev enclave (`dev-enclave.sh`) on the workstation.
 ///

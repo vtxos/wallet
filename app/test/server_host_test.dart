@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:app_core/sessions/service_delivery.dart' show RewritingDelivery;
+import 'package:core/sessions/service_delivery.dart' show RewritingDelivery;
 import 'package:app/services/server_host.dart';
 
 void main() {

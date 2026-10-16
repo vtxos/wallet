@@ -41,7 +41,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:app_core/threshold_types.dart' as threshold;
+import 'package:core/threshold_types.dart' as threshold;
 
 /// One pairing the service is party to, once both halves have arrived and checked out.
 class ServiceShare {

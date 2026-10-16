@@ -1,6 +1,6 @@
 # Merlin Wallet Flutter app
 
-The Android app holds Bitcoin as Ark VTXOs. It uses `../app-core` for wallet
+The Android app holds Bitcoin as Ark VTXOs. It uses `../core` for wallet
 operations and `../protocol` for shared messages.
 
 Onboarding selects a cosigner, creates a passkey, runs distributed key generation,

@@ -40,8 +40,8 @@ dependencies:
   provider: ^6.1.2
   intl: ^0.19.0
   qr_flutter: ^4.1.0
-  app_core:
-    path: ../app-core
+  core:
+    path: ../core
   protocol:
     path: ../protocol
   grpc: ^3.2.4

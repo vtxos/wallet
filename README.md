@@ -36,7 +36,7 @@ That division supports more than interactive payments. A user can sign a bounded
 | **Policy-controlled escrows** | Escrow creation, service pairing, release checks, allowance/reference tracking, and replies over runtime-held service connections. |
 | **Pre-signed exits** | Exit transaction construction and verification, coverage tracking, export, and ancestry display. The app does not yet broadcast the complete ancestor/exit chain. |
 | **An attested native client** | Nonce-bound verification of runtime/guest measurements and the connection certificate before an approved gRPC interaction is sent. |
-| **Development and integration tooling** | Android app, shared Dart core, regtest CLI, Rust/FFI tests, QEMU end-to-end tests, and a MutinyNet deployment runbook. |
+| **Development and integration tooling** | Android app, shared Dart core, regtest CLI, Rust/FFI tests, and QEMU end-to-end tests. |
 
 These are implementation capabilities, not a claim that every environment is validated or every finding is closed. The [security findings](SECURITY_FINDINGS.md) track known concerns, including cross-device PRF behavior, secret lifetimes, and test coverage. Some older assessments still refer to components that have since been replaced; current source and the test entry points below describe the active architecture.
 
@@ -45,7 +45,7 @@ These are implementation capabilities, not a claim that every environment is val
 ```mermaid
 flowchart TB
     subgraph Phone[Android phone]
-        App[Flutter wallet and Dart app-core]
+        App[Flutter wallet and Dart core]
         Passkey[Platform passkey and PRF]
         FFI[Rust threshold, Ark, and attestation FFI]
         Passkey --> App
@@ -84,8 +84,8 @@ Merlin is a concrete consumer of the runtime's capabilities. Its [`Host` trait](
 
 | Wallet need | Runtime capability | Merlin integration |
 |---|---|---|
-| Identify the service before sending an approval | Attestation on `/auth/*`, PCR0/PCR16, and certificate binding | [`attestation.dart`](app-core/lib/enclave/attestation.dart), [`gate.dart`](app-core/lib/enclave/gate.dart) |
-| Carry multiple signing rounds under one approved interaction | Passkey-minted interaction token, HTTP/2, bidirectional request/response bodies | [`connection.dart`](app-core/lib/cosigner/connection.dart), [`session.rs`](https://github.com/vtxos/cosigner/blob/main/cosigner/src/session.rs), [`grpc/`](https://github.com/vtxos/cosigner/blob/main/cosigner/src/grpc/) |
+| Identify the service before sending an approval | Attestation on `/auth/*`, PCR0/PCR16, and certificate binding | [`attestation.dart`](core/lib/enclave/attestation.dart), [`gate.dart`](core/lib/enclave/gate.dart) |
+| Carry multiple signing rounds under one approved interaction | Passkey-minted interaction token, HTTP/2, bidirectional request/response bodies | [`connection.dart`](core/lib/cosigner/connection.dart), [`session.rs`](https://github.com/vtxos/cosigner/blob/main/cosigner/src/session.rs), [`grpc/`](https://github.com/vtxos/cosigner/blob/main/cosigner/src/grpc/) |
 | Keep each wallet's files and execution separate | Tenant-scoped preopen and per-tenant execution lock | [`open_cosigner`](https://github.com/vtxos/cosigner/blob/main/cosigner/src/main.rs), [`store.rs`](https://github.com/vtxos/cosigner/blob/main/cosigner/src/store.rs) |
 | Preserve state beyond an invocation or restart | Copy-on-write encrypted filesystem and durable sync/rename operations | [`SnapshotState`](https://github.com/vtxos/cosigner/blob/main/cosigner/src/types.rs), [`cosigner.rs`](https://github.com/vtxos/cosigner/blob/main/cosigner/src/cosigner.rs) |
 | Execute an already authorized renewal later | `enclave:tasks/queue` and the `run-task` callback | [`renew.rs`](https://github.com/vtxos/cosigner/blob/main/cosigner/src/renew.rs), [`cosigner.rs`](https://github.com/vtxos/cosigner/blob/main/cosigner/src/cosigner.rs) |
@@ -136,7 +136,7 @@ The client checks three identities together:
 - **PCR16:** the cosigner component, with the settings written into it at deployment, measured by that runtime before key release.
 - **TLS leaf certificate:** the certificate of the connection that delivered the attested authentication response.
 
-Each authentication request carries a fresh nonce. The client verifies the document's signature/chain, pinned root, expected measurements, nonce, timestamp, and connection binding through [`crates/enclave-client`](https://github.com/vtxos/cosigner/blob/main/crates/enclave-client/) and FFI. [`PinnedTransportConnector`](app-core/lib/enclave/pinned_transport.dart) then checks the certificate before handing a socket to the gRPC transport.
+Each authentication request carries a fresh nonce. The client verifies the document's signature/chain, pinned root, expected measurements, nonce, timestamp, and connection binding through [`crates/enclave-client`](https://github.com/vtxos/cosigner/blob/main/crates/enclave-client/) and FFI. [`PinnedTransportConnector`](core/lib/enclave/pinned_transport.dart) then checks the certificate before handing a socket to the gRPC transport.
 
 Attestation is carried on the runtime's `/auth/*` responses. Guest gRPC responses do not carry a separate response-signing key or an application-body signature from the runtime. Their transport is tied to the certificate already attested. Attestation identifies approved code and its connection; application checks still determine what it may sign.
 
@@ -256,7 +256,7 @@ The smoke command checks attestation, separate wallets, and DKG; its funded path
 | Command | Purpose |
 |---|---|
 | `make ffi-test` | Tests for the merged native FFI library. |
-| `make ffi-build` then `(cd app-core && dart pub get && dart test)` | Shared client tests, including share reconstruction, operation lifetimes, attestation, and persistence. |
+| `make ffi-build` then `(cd core && dart pub get && dart test)` | Shared client tests, including share reconstruction, operation lifetimes, attestation, and persistence. |
 | `(cd app && flutter test)` | Flutter tests after package setup. |
 | `make e2e` | Builds the FFI, starts regtest/arkd, starts the dev enclave image and runs `e2e/test/enclave_ark_test.dart`. |
 | `make proto-check` | Verifies checked-in Dart stubs match the protobuf sources; requires `protoc` and the Dart plugin. |
@@ -271,14 +271,14 @@ make e2e-enclave ENCLAVE_RUN="$ENCLAVE_CHECKOUT/target/qemu-nitro/vtxos"
 
 An attached enclave's cosigner must also name the suite's escrow-service fixture and use a renewal margin suitable for the test timeout. The delegate test reports a skip if the deadline is too far away. The image carries nothing of this suite's: the harness gives the cosigner the settings in `e2e/lib/e2e_profile.dart` when it starts it (`GUEST_ENV`), written into the component and measured into PCR16 with it. Only one emulator stack can own the fixed MinIO port/vsock configuration at a time.
 
-CI (`.github/workflows/ci.yml`) runs the FFI's `cargo test`, every Dart package's analysis, `app-core`'s tests against the built FFI, the app's `flutter analyze` and `flutter test`, and the enclave e2e: the `enclave-e2e` job starts the dev enclave image on the runner's KVM (hosted runners have nested virtualisation; the runtime's own CI relies on the same) and runs the suite. Moving to a newer runtime or cosigner is infra's: it builds the image from its pins and prints the digest, which goes into `docker-compose.enclave.yml`, with the tags in `ffi/Cargo.toml` moved to the same cosigner release. A change to a ceremony is still run locally before it is called done. Host tests, QEMU integration tests, Android device tests, and real Nitro validation establish different properties.
+CI (`.github/workflows/ci.yml`) runs the FFI's `cargo test`, every Dart package's analysis, `core`'s tests against the built FFI, the app's `flutter analyze` and `flutter test`, and the enclave e2e: the `enclave-e2e` job starts the dev enclave image on the runner's KVM (hosted runners have nested virtualisation; the runtime's own CI relies on the same) and runs the suite. Moving to a newer runtime or cosigner is infra's: it builds the image from its pins and prints the digest, which goes into `docker-compose.enclave.yml`, with the tags in `ffi/Cargo.toml` moved to the same cosigner release. A change to a ceremony is still run locally before it is called done. Host tests, QEMU integration tests, Android device tests, and real Nitro validation establish different properties.
 
 ## Repository guide
 
 | Path | Responsibility |
 |---|---|
 | [`app/`](app/) | Flutter Android UI, passkey platform integration, onboarding, payments, and exit display. |
-| [`app-core/`](app-core/) | Dart protocol orchestration, attested transport, passkey derivation, persistence, and Ark client operations. |
+| [`core/`](core/) | Dart protocol orchestration, attested transport, passkey derivation, persistence, and Ark client operations. |
 | [`cosigner/`](https://github.com/vtxos/cosigner/blob/main/cosigner/) | Rust Wasm component: gRPC handlers, signing, file-backed state, delegates, escrows, policy, and host capability bindings. |
 | [`crates/threshold/`](https://github.com/vtxos/cosigner/blob/main/crates/threshold/) | FROST/DKG and supporting secp256k1 operations used by the guest and native FFI. |
 | [`crates/ark/`](https://github.com/vtxos/cosigner/blob/main/crates/ark/) | Ark transaction/protocol primitives, delegate and exit construction, and contract VTXOs. |
@@ -318,7 +318,7 @@ A share is the sum of both dealers' polynomials at the wallet's identifier:
 ```
 
 `f_wallet` is derived from the passkey's PRF output by a labelled HKDF
-(`app-core/lib/passkey/key_derivation.dart`). `f_cosigner(id)` is one scalar, which the cosigner
+(`core/lib/passkey/key_derivation.dart`). `f_cosigner(id)` is one scalar, which the cosigner
 sealed at DKG. Neither is the key. An operation that signs goes like this
 (`MpcClient._withOperation`):
 
@@ -335,7 +335,7 @@ sealed at DKG. Neither is the key. An operation that signs goes like this
    no second approval.
 5. **Add, fix the sign, check.** The sum is accepted only if `s·G` is the verifying share this
    device stored when the wallet was made — not one that arrived with the contribution
-   (`app-core/lib/passkey/share_reconstruction.dart`). The share signs every round of that stream:
+   (`core/lib/passkey/share_reconstruction.dart`). The share signs every round of that stream:
    a renewal's intent proof, its commitment, the trailing seal.
 6. **Let go**, in a `finally`: on success, on failure, and on cancellation
    (`MpcClient.cancelOperation`).
@@ -398,7 +398,7 @@ left the device nor whether those outpoints are still there — so a deal struck
 would be one the owner could empty at will. The mark is sealed before the reclaim's first nonce,
 so an abandoned reclaim is as final as a finished one; the next deal gets a new escrow.
 
-Tests: `app-core/test/share_reconstruction_test.dart`, `escrow_reconstruction_test.dart`,
+Tests: `core/test/share_reconstruction_test.dart`, `escrow_reconstruction_test.dart`,
 `operation_lifecycle_test.dart` (a cosigner in-process; reads the box file back as raw bytes),
 `cancel_streams_test.dart`, `cosigner/tests/stream_contribution_test.rs`, `seal_test.rs`, and
 the `nothing secret at rest`, `a wallet on a new phone` and `pairing a service into an escrow`
@@ -412,7 +412,7 @@ you have to trust for it not to.
 ### The one that matters: the Ark owner key is 2-of-2
 
 Ordinary wallet VTXOs and boarding outputs use the **FROST group key** as their owner key
-([`MpcClient._ownerXOnly`](app-core/lib/client.dart)). Escrow contracts have their own key and
+([`MpcClient._ownerXOnly`](core/lib/client.dart)). Escrow contracts have their own key and
 policy arrangements. The stock Ark taptree used for ordinary wallet outputs has two spend paths:
 
 ```
@@ -508,7 +508,7 @@ obtained later.
 
 Implementation: [`exit.rs`](https://github.com/vtxos/cosigner/blob/main/crates/ark/src/exit.rs) (shared transaction construction),
 [`FFI exit verification`](ffi/src/ark/exit.rs), [`renew.rs`](https://github.com/vtxos/cosigner/blob/main/cosigner/src/renew.rs),
-[`exit_plan.dart`](app-core/lib/sessions/exit_plan.dart), and
+[`exit_plan.dart`](core/lib/sessions/exit_plan.dart), and
 [`exit_screen.dart`](app/lib/screens/exit/exit_screen.dart).
 
 ### The better answer, still to come
@@ -524,7 +524,7 @@ recovery leaf:  <recov_delay>  OP_CSV OP_DROP    <recovery_pk> OP_CHECKSIG   # p
 ```
 
 The candidate recovery scalar is the wallet's dealer secret `a0`, derived by
-[`walletPolynomial`](app-core/lib/passkey/key_derivation.dart) from the passkey PRF. Its public
+[`walletPolynomial`](core/lib/passkey/key_derivation.dart) from the passkey PRF. Its public
 point could authorize a delayed recovery spend without reconstructing the ordinary group key.
 That would still depend on possession of a functioning passkey and stable derivation.
 

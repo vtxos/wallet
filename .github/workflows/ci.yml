@@ -52,7 +52,7 @@ jobs:
           path: ffi/target/release/libmpcwallet_ffi.so
 
   dart:
-    name: Dart (protocol, app-core, cli, e2e)
+    name: Dart (protocol, core, cli, e2e)
     needs: rust
     runs-on: ubuntu-latest
     steps:
@@ -60,7 +60,7 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: ffi
-          # Where `app-core/lib/threshold/src/native_library.dart` looks, walking up from cwd.
+          # Where `core/lib/threshold/src/native_library.dart` looks, walking up from cwd.
           path: ffi/target/release
       - uses: dart-lang/setup-dart@v1
         with:
@@ -76,11 +76,11 @@ jobs:
         run: make proto
       - name: Analyze every package
         run: |
-          for pkg in protocol app-core cli e2e; do
+          for pkg in protocol core cli e2e; do
             (cd $pkg && dart pub get && dart analyze)
           done
-      - name: app-core tests
-        run: cd app-core && dart test
+      - name: core tests
+        run: cd core && dart test
 
   flutter:
     name: Flutter (analyze, test)

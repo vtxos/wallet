@@ -20,12 +20,12 @@ library;
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:app_core/asp/asp_client.dart' show IndexerVtxo;
-import 'package:app_core/client.dart';
-import 'package:app_core/enclave/authenticator.dart' show SoftwareAuthenticator;
-import 'package:app_core/platform/bank_send.dart';
-import 'package:app_core/platform/platform_client.dart';
-import 'package:app_core/sessions/service_delivery.dart' show RewritingDelivery;
+import 'package:core/asp/asp_client.dart' show IndexerVtxo;
+import 'package:core/client.dart';
+import 'package:core/enclave/authenticator.dart' show SoftwareAuthenticator;
+import 'package:core/platform/bank_send.dart';
+import 'package:core/platform/platform_client.dart';
+import 'package:core/sessions/service_delivery.dart' show RewritingDelivery;
 import 'package:e2e/boarding_poll.dart';
 import 'package:e2e/e2e_profile.dart';
 import 'package:e2e/logger.dart';

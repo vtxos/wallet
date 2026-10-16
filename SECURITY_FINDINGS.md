@@ -41,7 +41,7 @@ Do NOT fix yet — just record. Fix pass happens once, after this list is comple
 - [ ] **TH-8** tag FFI handles by type (kill `free_handle` type-confusion / double-free / secret-leak). NOTE: FFI's only caller is the trusted Dart wrapper (correct type_ids + lifecycle), so this is defense-in-depth hardening, not a live exploit. Proper fix = enum-tagged handle across ~13 box/borrow/free sites (cargo-verifiable; handle lifecycle not e2e-testable here).
 - [x] **TH-3** ✓ FIXED (Debug part) — redacting `Debug` on all 5 secret structs (KeyPackage, SigningNonce, Round1/2 secret pkgs, Round2Package); ffi builds + 38 threshold tests pass. Zeroize-on-drop DEFERRED: `Drop` fights Rust move-semantics on the `Copy` scalars (forces `.clone()` churn in the tweak/sign hot path) for marginal gain — needs a non-Copy secret-wrapper refactor.
 - [~] **TH-6** PARTIAL — the wallet no longer uses the improvised seeded derivation: the DKG
-  polynomial comes from one labelled HKDF (`app-core/lib/passkey/key_derivation.dart`), so the
+  polynomial comes from one labelled HKDF (`core/lib/passkey/key_derivation.dart`), so the
   Dart/Rust disagreement in `dkgRefreshPart1(seed:)` is no longer on any wallet path. Share blinding
   is gone altogether — no share is kept to blind — and its label, `merlin/frost/blind/v1`, is
   retired and must not be reused.
@@ -57,7 +57,7 @@ Do NOT fix yet — just record. Fix pass happens once, after this list is comple
   rounds of cancellation fixes, which sit on the happy paths of `Send`, `Settle` and `Recover`
   (`CancelSignal.guard` around every ASP wait, a tracked `Recover` call, `_stillRunning` before
   every state change); this run is over them. Cancellation *itself* is still proved only in
-  `app-core/test/operation_lifecycle_test.dart` — the e2e never cancels anything.
+  `core/test/operation_lifecycle_test.dart` — the e2e never cancels anything.
 - [ ] **NK-2** let a stale fingerprint prompt be withdrawn: plumb a `CancellationSignal` through
   `app/android/.../PasskeyPlugin.kt` and `PasskeyChannel`. Today a prompt cannot be taken off the
   screen from Dart, so an operation queued behind a cancelled one waits for the owner to answer or
@@ -65,7 +65,7 @@ Do NOT fix yet — just record. Fix pass happens once, after this list is comple
   late seed is overwritten, the late approval dropped — RC-4), but poor. Not written: Kotlin that
   cannot be device-tested from a dev box.
 - [ ] **NK-3** a Flutter-side test of the queued-prompt fix against the real `PlatformPasskey` with a
-  mocked platform channel — how the reviewer reproduced it. The app-core test uses a stand-in seed
+  mocked platform channel — how the reviewer reproduced it. The core test uses a stand-in seed
   source that enforces the same one-capture-at-a-time rule; the fix lives in `MpcClient`, so it
   covers both, but the real class's capture/cleanup ordering is asserted nowhere.
 - [ ] **NK-4** manual two-device PRF test (RC-2) — promoted from "before relying on recovery" to
@@ -80,7 +80,7 @@ Do NOT fix yet — just record. Fix pass happens once, after this list is comple
   Product/ASP-policy call. Also: send, protect and renew have no "Stop waiting" of their own.
 - [x] NK-6 ✓ DONE 2026-09-26 — `.github/workflows/ci.yml` replaces `e2e.yml` (which built a native
   `cosigner` binary that no longer exists and ran an archived test, so it could not pass): cosigner,
-  threshold and ffi `cargo test`; every Dart package analyzed; `app-core` tests against the built
+  threshold and ffi `cargo test`; every Dart package analyzed; `core` tests against the built
   FFI; `flutter analyze` + `flutter test`. `AGENTS.md` rewritten for the current layout.
   Required-check names changed — branch protection, if any, needs `Rust (cosigner, threshold, ffi)`
   / `Dart (…)` / `Flutter (…)`. Later the same day: the `enclave-e2e` job boots the e2e from a
@@ -185,7 +185,7 @@ escrow tests — the branch's first end-to-end run since the escrow commits.
 
 ## ACCEPTED BY DESIGN (recorded so it is not re-raised as a finding)
 
-- **[RC-1] The passkey is now the single factor.** `app-core/lib/passkey/key_derivation.dart`,
+- **[RC-1] The passkey is now the single factor.** `core/lib/passkey/key_derivation.dart`,
   `cosigner/src/cosigner.rs`. The wallet's FROST dealer polynomial is derived from the
   passkey's PRF, and the cosigner seals `f_cosigner(wallet_id)` — the half it dealt — so `Recover`
   plus the passkey reconstructs the share on any device. Before this, an attacker needed the
@@ -211,8 +211,8 @@ escrow tests — the branch's first end-to-end run since the escrow commits.
   not only by recovery: a PRF that drifted on the *same* device would now stop payments there,
   loudly (`WrongPasskey`), where it used to stop only the unblinding.
 - **[RC-3] The device stores no private-key material; the share is rebuilt per operation.**
-  `app-core/lib/client.dart` (`_withOperation`), `app-core/lib/passkey/operation_secrets.dart`,
-  `app-core/lib/passkey/share_reconstruction.dart`, `cosigner/src/cosigner.rs`
+  `core/lib/client.dart` (`_withOperation`), `core/lib/passkey/operation_secrets.dart`,
+  `core/lib/passkey/share_reconstruction.dart`, `cosigner/src/cosigner.rs`
   (`dealt_share_for`), `cosigner/src/session.rs`. Development architecture; not production-ready.
   - *What changed.* The phone used to persist a blinded share (δ) and — in the clear — the DKG
     dealer secret `a0` as `onchainSecret`, in an unencrypted append-only Hive box, and kept the PRF
@@ -263,11 +263,11 @@ escrow tests — the branch's first end-to-end run since the escrow commits.
       needed the cosigner's own share out of the same blob — but nothing on the phone can stand in.
   - *Follow-ups:* NK-4, NK-6 in the master list (NK-1 done).
 - **[RC-4] Cancelling an operation: what it guarantees, and what it cannot.**
-  `app-core/lib/client.dart` (`_withOperation`, `_runOperation`, `_takeSeed`, `_stillRunning`,
-  `cancelOperation`), `app-core/lib/passkey/operation_secrets.dart` (`CancelSignal`),
-  `app-core/lib/cosigner/connection.dart` (`cancelOpenStreams`). Three review rounds; each finding
+  `core/lib/client.dart` (`_withOperation`, `_runOperation`, `_takeSeed`, `_stillRunning`,
+  `cancelOperation`), `core/lib/passkey/operation_secrets.dart` (`CancelSignal`),
+  `core/lib/cosigner/connection.dart` (`cancelOpenStreams`). Three review rounds; each finding
   below was reproduced, fixed, and its test mutation-checked
-  (`app-core/test/operation_lifecycle_test.dart`).
+  (`core/test/operation_lifecycle_test.dart`).
   - *Why it exists.* An operation holds the rebuilt share for as long as it runs, and operations
     that sign are serialized behind one lock (RC-3). So an operation that cannot be stopped is a
     share that cannot be released **and** a wallet that cannot do anything else. `close()` is a
@@ -353,10 +353,10 @@ escrow tests — the branch's first end-to-end run since the escrow commits.
 
 ## NEW (found + verified this pass)
 
-### Enclave attestation (crates/enclave-client + ffi/src/enclave + app-core attested transport)
+### Enclave attestation (crates/enclave-client + ffi/src/enclave + core attested transport)
 - **[EC-3] MED→HIGH CONFIRMED** — **appKeyHash binding fails OPEN.**
   `ffi/src/enclave/mod.rs:108` `extract_app_key_hash(...).unwrap_or_default()` returns
-  `ok:true` with an EMPTY `app_key_hash` when extraction fails; `app-core/lib/attested_wallet_api.dart:217`
+  `ok:true` with an EMPTY `app_key_hash` when extraction fails; `core/lib/attested_wallet_api.dart:217`
   `if (v.appKeyHash.isNotEmpty)` then **skips** the `SHA256(attest_pubkey)==appKeyHash` check
   and caches the server-supplied `/v1/enclave-info` pubkey unbound (attested_wallet_api.dart:227-232).
   Response signatures (post(), :256-260) are then verified against an attacker-controllable key
@@ -426,7 +426,7 @@ escrow tests — the branch's first end-to-end run since the escrow commits.
   `kms:Decrypt` from the host.
 - **[IN-2] HIGH CONFIRMED** — client pins PCR0 from a MUTABLE, UNSIGNED GitHub release
   (`.../releases/download/eif-latest/deployment.json`, plain http, no sig check —
-  app-core/lib/enclave/manifest.dart:45-62 → mpc_service.dart:143-144,178-182), and `eif-latest` is
+  core/lib/enclave/manifest.dart:45-62 → mpc_service.dart:143-144,178-182), and `eif-latest` is
   clobbered every build (release-eif.yml:60-61,109). A KMS-signed PCR0 (`/Signing/Signature` over
   `/Signing/PCR0`, main.tf:198-257) AND a Sigstore provenance attestation exist but NO client code uses
   either (both dead). Whoever can clobber the release repoints every client's attestation root.

@@ -1,5 +1,5 @@
-import 'package:app_core/platform/bank_send.dart' show BankSend;
-import 'package:app_core/platform/platform_client.dart' show PayoutQuote;
+import 'package:core/platform/bank_send.dart' show BankSend;
+import 'package:core/platform/platform_client.dart' show PayoutQuote;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';

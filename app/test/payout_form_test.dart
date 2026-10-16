@@ -1,7 +1,7 @@
 import 'package:app/screens/send/payout_form_screen.dart';
 import 'package:app/services/mpc_service.dart';
 import 'package:app/services/payout_service.dart';
-import 'package:app_core/platform/platform_client.dart';
+import 'package:core/platform/platform_client.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';

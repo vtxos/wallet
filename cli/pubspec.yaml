@@ -7,8 +7,8 @@ environment:
   sdk: '>=3.3.0 <4.0.0'
 
 dependencies:
-  app_core:
-    path: ../app-core
+  core:
+    path: ../core
   protocol:
     path: ../protocol
   bitcoin_base: ^7.0.0

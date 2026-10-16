@@ -3,7 +3,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
-import 'package:app_core/persistence/wallet_store.dart'
+import 'package:core/persistence/wallet_store.dart'
     show IncompatibleWalletStateException;
 import '../services/mpc_service.dart';
 

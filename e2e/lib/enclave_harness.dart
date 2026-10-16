@@ -24,9 +24,9 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:math' show Random;
 
-import 'package:app_core/client.dart';
-import 'package:app_core/enclave/dev_enclave.dart';
-import 'package:app_core/enclave/gate.dart';
+import 'package:core/client.dart';
+import 'package:core/enclave/dev_enclave.dart';
+import 'package:core/enclave/gate.dart';
 import 'package:hive/hive.dart';
 
 import 'logger.dart';

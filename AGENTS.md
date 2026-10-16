@@ -2,7 +2,7 @@
 
 ## Project Structure & Module Organization
 - `app/` Flutter app (`app/lib/screens`, `app/lib/services/mpc_service.dart`, `app/lib/passkey/`).
-- `app-core/` Dart wallet core: `client.dart` (`MpcClient`), `sessions/` (one driver per ceremony
+- `core/` Dart wallet core: `client.dart` (`MpcClient`), `sessions/` (one driver per ceremony
   stream), `passkey/` (key derivation, share reconstruction, operation secrets), `cosigner/`
   (the gRPC connection), `enclave/` (attested gate), `persistence/` (public state only).
 - The cosigner — the Rust `wasm32-wasip2` component enclave-runtime serves — lives in
@@ -22,8 +22,8 @@
 - `make proto` regenerate Dart stubs (needs `protoc` and `dart pub global activate protoc_plugin
   21.1.2`, the generator for the protobuf 3 runtime `protocol` pins);
   `make proto-check` diffs them.
-- `make ffi-build` build `ffi/target/release/libmpcwallet_ffi.so`; `app-core` tests need it.
-- `cd app-core && dart test`; `cd app && flutter analyze --no-fatal-infos && flutter test`;
+- `make ffi-build` build `ffi/target/release/libmpcwallet_ffi.so`; `core` tests need it.
+- `cd core && dart test`; `cd app && flutter analyze --no-fatal-infos && flutter test`;
   `dart analyze` in `protocol/`, `cli/`, `e2e/`. Flutter may be off PATH (`~/dev/flutter/bin`).
 - `make up-enclave` boots a dev enclave (docker regtest + arkd + QEMU from the `~/enclave-runtime`
   checkout, serving `make cosigner`'s wasm or `COSIGNER_WASM`); `make e2e-enclave` runs the suite
@@ -47,7 +47,7 @@
 
 ## Testing Guidelines
 - Tests live under `*/test` (Dart, `_test.dart`) and `*/tests` (Rust). Crypto and core logic get
-  unit tests; `app-core/test/operation_lifecycle_test.dart` drives `MpcClient` against an
+  unit tests; `core/test/operation_lifecycle_test.dart` drives `MpcClient` against an
   in-process cosigner; the cosigner's own tests are in vtxos/cosigner.
 - A fix to a security-relevant path comes with a test that fails without it (mutation-check it).
 - `make e2e-enclave` needs docker, KVM and vsock (`modprobe vsock_loopback`); ~7 minutes warm.

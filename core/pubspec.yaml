@@ -1,0 +1,31 @@
+name: core
+description: The wallet core, client-side MPC wallet operations.
+version: 1.0.0
+publish_to: none
+
+environment:
+  sdk: '>=3.3.0 <4.0.0'
+
+dependencies:
+  grpc: ^3.2.4
+  protobuf: ^3.1.0
+  protocol:
+    path: ../protocol
+  bitcoin_base: ^7.0.0
+  hive: ^2.2.3
+  convert: ^3.1.2
+  blockchain_utils: ^5.4.0
+  fixnum: ^1.1.1
+  http: ^1.2.0
+  path: ^1.9.0
+  synchronized: ^3.1.0
+  crypto: ^3.0.5
+  http2: ^2.3.1
+  cryptography: ^2.7.0
+  ffi: '>=2.1.0 <2.1.4'
+  # Note: 'ffi' above is dart:ffi version constraint.
+  # 'package:ffi' below provides Utf8 helpers for FFI string conversion.
+
+dev_dependencies:
+  test: ^1.24.0
+  lints: ^3.0.0

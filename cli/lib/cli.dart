@@ -3,12 +3,12 @@ library;
 
 import 'dart:io';
 
-import 'package:app_core/asp/asp_client.dart' show IndexerVtxo;
-import 'package:app_core/client.dart';
-import 'package:app_core/electrum.dart';
-import 'package:app_core/enclave/dev_enclave.dart';
-import 'package:app_core/enclave/gate.dart';
-import 'package:app_core/persistence/wallet_store.dart' show IncompatibleWalletStateException;
+import 'package:core/asp/asp_client.dart' show IndexerVtxo;
+import 'package:core/client.dart';
+import 'package:core/electrum.dart';
+import 'package:core/enclave/dev_enclave.dart';
+import 'package:core/enclave/gate.dart';
+import 'package:core/persistence/wallet_store.dart' show IncompatibleWalletStateException;
 import 'package:bitcoin_base/bitcoin_base.dart';
 import 'package:blockchain_utils/blockchain_utils.dart' hide hex;
 import 'package:fixnum/fixnum.dart';

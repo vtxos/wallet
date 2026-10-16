@@ -4,8 +4,8 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
-import 'package:app_core/asp/asp_client.dart' show IndexerVtxo;
-import 'package:app_core/asp/history.dart';
+import 'package:core/asp/asp_client.dart' show IndexerVtxo;
+import 'package:core/asp/history.dart';
 import 'package:app/services/mpc_service.dart';
 import 'package:app/widgets/app_bottom_nav.dart';
 
@@ -58,7 +58,7 @@ class ArkScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   // Rebuilt from the ASP indexer on each refresh — receives included, and no
-                  // cosigner call, so no passkey prompt. See `app_core/asp/history.dart`.
+                  // cosigner call, so no passkey prompt. See `core/asp/history.dart`.
                   Expanded(
                     child: mpcService.arkHistory.isEmpty
                         ? _buildEmptyHistory()

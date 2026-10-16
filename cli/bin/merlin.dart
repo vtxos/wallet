@@ -10,8 +10,8 @@ library;
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:app_core/enclave/attestation.dart';
-import 'package:app_core/enclave/gate.dart';
+import 'package:core/enclave/attestation.dart';
+import 'package:core/enclave/gate.dart';
 import 'package:merlin_cli/cli.dart';
 
 Future<void> main(List<String> args) async {
