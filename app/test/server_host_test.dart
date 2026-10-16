@@ -113,7 +113,7 @@ void main() {
   });
 
   group('payout platform', () {
-    test('a local host has MerlinPlatform beside the enclave, reached the same way', () {
+    test('a local host has the platform beside the enclave, reached the same way', () {
       expect(platformBase('127.0.0.1').toString(), 'http://127.0.0.1:7200');
       expect(platformBase('10.0.2.2').toString(), 'http://10.0.2.2:7200');
     });

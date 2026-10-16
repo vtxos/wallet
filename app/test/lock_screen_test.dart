@@ -82,7 +82,7 @@ void main() {
     final wallet = _LockedWallet([PlatformException(code: PasskeyChannel.cancelled), null]);
     await tester.pumpWidget(ChangeNotifierProvider<MpcService>.value(
       value: wallet,
-      child: const MerlinWalletApp(),
+      child: const VtxosApp(),
     ));
     await tester.pump();
 
@@ -111,7 +111,7 @@ void main() {
     final wallet = _LockedWallet([PlatformException(code: PasskeyChannel.cancelled)]);
     await tester.pumpWidget(ChangeNotifierProvider<MpcService>.value(
       value: wallet,
-      child: const MerlinWalletApp(),
+      child: const VtxosApp(),
     ));
     await tester.pump();
 
@@ -132,7 +132,7 @@ void main() {
     final wallet = _OpenWallet()..busy = true;
     await tester.pumpWidget(ChangeNotifierProvider<MpcService>.value(
       value: wallet,
-      child: const MerlinWalletApp(),
+      child: const VtxosApp(),
     ));
 
     leaveAndReturn(tester);
@@ -150,7 +150,7 @@ void main() {
     final wallet = _OpenWallet();
     await tester.pumpWidget(ChangeNotifierProvider<MpcService>.value(
       value: wallet,
-      child: const MerlinWalletApp(),
+      child: const VtxosApp(),
     ));
 
     // A prompt is up — the platform has not answered — and its sheet hides the app.

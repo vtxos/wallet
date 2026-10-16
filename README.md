@@ -1,10 +1,10 @@
-# Merlin Wallet
+# vtxos wallet
 
 **A passkey-based Bitcoin wallet with a Wasm cosigner: approve on your phone, verify the service you are trusting, and let previously authorized work continue while you are offline.**
 
-Merlin holds Bitcoin as **Ark off-chain VTXOs**. Ordinary wallet signing uses a **2-of-2 FROST key** shared between the phone and a remote cosigner. The phone reconstructs its signing share for each operation from its passkey and the cosigner's stored contribution, rather than keeping a FROST share in the application's persistent state.
+vtxos holds Bitcoin as **Ark off-chain VTXOs**. Ordinary wallet signing uses a **2-of-2 FROST key** shared between the phone and a remote cosigner. The phone reconstructs its signing share for each operation from its passkey and the cosigner's stored contribution, rather than keeping a FROST share in the application's persistent state.
 
-The cosigner is a Rust component running on [**enclave-runtime**](https://github.com/BitspendPayment/enclave-runtime). The runtime supplies attested HTTPS, passkey authorization, tenant-scoped encrypted storage, background scheduling, maintained connections, and device wake notifications. Merlin supplies the wallet protocol, signing rules, Ark integration, and application policy.
+The [cosigner](https://github.com/vtxos/cosigner) is a Rust component running on [**the runtime**](https://github.com/vtxos/runtime). The runtime supplies attested HTTPS, passkey authorization, tenant-scoped encrypted storage, background scheduling, maintained connections, and device wake notifications. The wallet and its cosigner supply the wallet protocol, signing rules, Ark integration, and application policy.
 
 That division supports more than interactive payments. A user can sign a bounded renewal delegate while present, then let the cosigner execute it with an Ark Service Provider (ASP) later. An explicitly paired escrow service can also initiate a policy-checked exchange through a connection the runtime maintains.
 
@@ -12,9 +12,9 @@ That division supports more than interactive payments. A user can sign a bounded
 
 ## Contents
 
-- [What Merlin implements](#what-merlin-implements)
+- [What the wallet implements](#what-the-wallet-implements)
 - [Architecture](#architecture)
-- [How Merlin uses enclave-runtime](#how-merlin-uses-enclave-runtime)
+- [How the wallet uses the runtime](#how-the-wallet-uses-the-runtime)
 - [A concrete demonstration: renew while the phone is offline](#a-concrete-demonstration-renew-while-the-phone-is-offline)
 - [Attestation, authorization, and isolation](#attestation-authorization-and-isolation)
 - [Build and run](#build-and-run)
@@ -25,7 +25,7 @@ That division supports more than interactive payments. A user can sign a bounded
 - [Trust assumptions & failure modes](#trust-assumptions--failure-modes)
 - [Emergency exit](#emergency-exit)
 
-## What Merlin implements
+## What the wallet implements
 
 | Capability | What is in the repository |
 |---|---|
@@ -78,11 +78,11 @@ flowchart TB
 
 The current server artifact is [`cosigner.wasm`](https://github.com/vtxos/cosigner/blob/main/cosigner/src/main.rs), built for `wasm32-wasip2`. It exports `wasi:http/incoming-handler`, `run-task`, and `on-message`. It has no listener, TLS server, or native per-user actor registry. The host library build exists for tests and development tools; running it as a standalone server is not the serving path.
 
-## How Merlin uses enclave-runtime
+## How the wallet uses the runtime
 
-Merlin is a concrete consumer of the runtime's capabilities. Its [`Host` trait](https://github.com/vtxos/cosigner/blob/main/cosigner/src/host.rs) is implemented by the [WIT adapter](https://github.com/vtxos/cosigner/blob/main/cosigner/src/main.rs), and its [component world](https://github.com/vtxos/cosigner/blob/main/cosigner/wit/cosigner.wit) composes the tasks, notification, and stream interfaces.
+The wallet is a concrete consumer of the runtime's capabilities. The cosigner's [`Host` trait](https://github.com/vtxos/cosigner/blob/main/cosigner/src/host.rs) is implemented by the [WIT adapter](https://github.com/vtxos/cosigner/blob/main/cosigner/src/main.rs), and its [component world](https://github.com/vtxos/cosigner/blob/main/cosigner/wit/cosigner.wit) composes the tasks, notification, and stream interfaces.
 
-| Wallet need | Runtime capability | Merlin integration |
+| Wallet need | Runtime capability | Where the wallet uses it |
 |---|---|---|
 | Identify the service before sending an approval | Attestation on `/auth/*`, PCR0/PCR16, and certificate binding | [`attestation.dart`](core/lib/enclave/attestation.dart), [`gate.dart`](core/lib/enclave/gate.dart) |
 | Carry multiple signing rounds under one approved interaction | Passkey-minted interaction token, HTTP/2, bidirectional request/response bodies | [`connection.dart`](core/lib/cosigner/connection.dart), [`session.rs`](https://github.com/vtxos/cosigner/blob/main/cosigner/src/session.rs), [`grpc/`](https://github.com/vtxos/cosigner/blob/main/cosigner/src/grpc/) |
@@ -97,7 +97,7 @@ Merlin is a concrete consumer of the runtime's capabilities. Its [`Host` trait](
 
 The guest's store is a small **key-value layer over files**, not an embedded SQLite database. A value is stored at `<root>/<hex-tree>/<hex-key>`; writes use a temporary file and rename. Hex-encoded names prevent a caller-controlled key from becoming a filesystem path.
 
-Those are ordinary files from the guest's perspective. Under enclave-runtime, they live inside the wallet's tenant scope and are backed by encrypted S3 slabs and signed filesystem roots. Snapshot serialization is Merlin's responsibility; storage encryption, publication, and recovery are the runtime's. A native test using the same file store does not acquire enclave storage encryption automatically.
+Those are ordinary files from the guest's perspective. Under enclave-runtime, they live inside the wallet's tenant scope and are backed by encrypted S3 slabs and signed filesystem roots. Snapshot serialization is the cosigner's responsibility; storage encryption, publication, and recovery are the runtime's. A native test using the same file store does not acquire enclave storage encryption automatically.
 
 The runtime mounts one shared filesystem and gives each tenant a restricted view. It serializes that tenant's HTTP invocations, background work, and message callbacks. Healthy HTTP instances may be reused for the same tenant; callbacks and restarts can rebuild them. Durable wallet state belongs in the store, not in assumptions about an instance staying alive.
 
@@ -147,7 +147,7 @@ request options → verify enclave → user-verified passkey assertion
                 → single-use interaction token → approved gRPC stream
 ```
 
-The runtime token binds the method, path, and query. It does not by itself approve every payload byte or every signing round. Merlin's protocol must validate the transaction, policy, and cryptographic contributions inside the stream. A service-initiated escrow release uses the standing policy and paired service identity rather than manufacturing a fresh phone approval.
+The runtime token binds the method, path, and query. It does not by itself approve every payload byte or every signing round. The wallet protocol must validate the transaction, policy, and cryptographic contributions inside the stream. A service-initiated escrow release uses the standing policy and paired service identity rather than manufacturing a fresh phone approval.
 
 The passkey has two distinct roles: authenticating an interaction to the runtime and deriving the phone's contribution through the PRF. Their combination is the basis of the [no-key-at-rest flow](#no-key-at-rest).
 
@@ -169,7 +169,7 @@ The complete development stack targets **Linux with KVM and vsock**. Install:
 - `python3`, `jq`, `curl`, `openssl`, and standard Linux shell utilities.
 - For Android: the Android SDK/ADB and NDK. The Makefile defaults to NDK `27.0.12077973`; override its build variables to match an intentional toolchain change.
 
-The cosigner is [vtxos/cosigner](https://github.com/vtxos/cosigner), which builds and releases `cosigner.wasm`; its crates (`threshold`, `ark`, `enclave-client`) are `ffi/`'s git dependencies at the release tag `ffi/Cargo.toml` names, and `make proto` takes the protos from that same checkout, so `ffi/Cargo.lock` pins both. The enclave the e2e boots is the **dev enclave image** pinned in [`docker-compose.enclave.yml`](docker-compose.enclave.yml): [enclave-runtime](https://github.com/vtxos/enclave-runtime)'s QEMU enclave and that cosigner release in one container, built by infra. The host needs Docker, KVM and vsock, and none of Nix, cargo, wasi-sdk or a runtime checkout. From the repository root:
+The cosigner is [vtxos/cosigner](https://github.com/vtxos/cosigner), which builds and releases `cosigner.wasm`; its crates (`threshold`, `ark`, `enclave-client`) are `ffi/`'s git dependencies at the release tag `ffi/Cargo.toml` names, and `make proto` takes the protos from that same checkout, so `ffi/Cargo.lock` pins both. The enclave the e2e boots is the **dev enclave image** pinned in [`docker-compose.enclave.yml`](docker-compose.enclave.yml): [the runtime](https://github.com/vtxos/runtime)'s QEMU enclave and that cosigner release in one container, built by infra. The host needs Docker, KVM and vsock, and none of Nix, cargo, wasi-sdk or a runtime checkout. From the repository root:
 
 ```bash
 sudo modprobe vsock_loopback
@@ -186,7 +186,7 @@ cargo install vhost-device-vsock --version 0.3.0 --locked \
   --root "$ENCLAVE_CHECKOUT/target/qemu-nitro/tools"
 ```
 
-The runtime's [development guide](https://github.com/BitspendPayment/enclave-runtime/blob/merkle-block-store/docs/DEV_ENCLAVE.md) describes the emulator prerequisites and network setup. The first image build can take much longer than a warm restart.
+The runtime's [development guide](https://github.com/vtxos/runtime/blob/main/docs/DEV_ENCLAVE.md) describes the emulator prerequisites and network setup. The first image build can take much longer than a warm restart.
 
 ### Start a persistent regtest environment
 
@@ -243,7 +243,7 @@ Built, tested and released in [vtxos/cosigner](https://github.com/vtxos/cosigner
 
 ### MutinyNet development deployment
 
-The MutinyNet deployment is [vtxos/merlin-infra](https://github.com/vtxos/merlin-infra)'s: the released cosigner in a Nitro enclave, and its runbook. Against it, from the repository root:
+The MutinyNet deployment is [vtxos/infra](https://github.com/vtxos/infra)'s: the released cosigner in a Nitro enclave, and its runbook. Against it, from the repository root:
 
 ```bash
 make mutinynet-smoke
@@ -287,9 +287,9 @@ CI (`.github/workflows/ci.yml`) runs the FFI's `cargo test`, every Dart package'
 | [`protocol/`](protocol/) | Protobuf contracts and generated Dart messages/stubs. |
 | [`cli/`](cli/) | Regtest wallet REPL using software passkeys and the same client core; `bin/bob.dart` is Bob, the integration test's counterparty (`make bob-up`). |
 | [`e2e/`](e2e/) | QEMU harness, regtest integration scenarios, and test escrow service. |
-| [`scripts/`](scripts/) | Component builds, interface checks, local stack startup, and development helpers. |
+| [`scripts/`](scripts/) | Local stack startup, regtest and ASP setup, and development helpers. |
 
-The runtime is maintained in its [separate repository](https://github.com/BitspendPayment/enclave-runtime). It owns the measured host and storage machinery; Merlin owns the application component and wallet clients.
+The runtime is maintained in its [separate repository](https://github.com/vtxos/runtime). It owns the measured host and storage machinery; [vtxos/cosigner](https://github.com/vtxos/cosigner) owns the application component, and this repository the wallet clients.
 
 ## Security model summary
 
@@ -331,7 +331,7 @@ sealed at DKG. Neither is the key. An operation that signs goes like this
    that does not derive this wallet's identifier is refused here, before anything is opened.
 4. **Open the stream.** Its open names the wallet's identifier; the cosigner's first answer carries
    `wallet_dealt_share`, on `Sign`, `Send` and `Renew` alike — once per stream, and never the
-   cosigner's own share (`cosigner/src/cosigner.rs`, `dealt_share_for`). No second call, so
+   cosigner's own share ([`cosigner.rs`](https://github.com/vtxos/cosigner/blob/main/cosigner/src/cosigner.rs), `dealt_share_for`). No second call, so
    no second approval.
 5. **Add, fix the sign, check.** The sum is accepted only if `s·G` is the verifying share this
    device stored when the wallet was made — not one that arrived with the contribution
@@ -400,7 +400,7 @@ so an abandoned reclaim is as final as a finished one; the next deal gets a new 
 
 Tests: `core/test/share_reconstruction_test.dart`, `escrow_reconstruction_test.dart`,
 `operation_lifecycle_test.dart` (a cosigner in-process; reads the box file back as raw bytes),
-`cancel_streams_test.dart`, `cosigner/tests/stream_contribution_test.rs`, `seal_test.rs`, and
+`cancel_streams_test.dart`, the cosigner's [`stream_contribution_test.rs`](https://github.com/vtxos/cosigner/blob/main/cosigner/tests/stream_contribution_test.rs) and [`seal_test.rs`](https://github.com/vtxos/cosigner/blob/main/cosigner/tests/seal_test.rs), and
 the `nothing secret at rest`, `a wallet on a new phone` and `pairing a service into an escrow`
 groups of `e2e/test/enclave_ark_test.dart`.
 
@@ -420,8 +420,8 @@ forfeit leaf:  <asp_pk> OP_CHECKSIGVERIFY <owner_pk> OP_CHECKSIG
 exit leaf:     <delay>  OP_CSV OP_DROP    <owner_pk> OP_CHECKSIG
 ```
 
-See [`Vtxo::new_default`](https://github.com/vtxos/cosigner/blob/main/cosigner/vendor/ark-core/src/vtxo.rs) and the
-[`multisig_script` / `csv_sig_script` builders](https://github.com/vtxos/cosigner/blob/main/cosigner/vendor/ark-core/src/script.rs).
+See ark-core's [`Vtxo::new_default`](https://docs.rs/ark-core/0.9.1/src/ark_core/vtxo.rs.html#123) and its
+[`multisig_script`](https://docs.rs/ark-core/0.9.1/src/ark_core/script.rs.html#23) and [`csv_sig_script`](https://docs.rs/ark-core/0.9.1/src/ark_core/script.rs.html#54) builders.
 
 Both name `owner_pk`, and here it is the group key. The exit timelock controls
 when funds can be spent; it does not remove the need for a group-key signature.
@@ -550,7 +550,7 @@ exits remain the implemented mechanism while this broader path is unfinished.
 - [BIP-341: Taproot](https://github.com/bitcoin/bips/blob/master/bip-0341.mediawiki)
 - [Ark protocol](https://arkdev.info/) — off-chain VTXOs via an Ark Service Provider
 - [AWS Nitro Enclaves](https://docs.aws.amazon.com/enclaves/latest/user/nitro-enclave.html)
-- [enclave-runtime](https://github.com/BitspendPayment/enclave-runtime) — the Wasm host, encrypted filesystem, attestation, and background capabilities used by Merlin
+- [vtxos/runtime](https://github.com/vtxos/runtime) — the Wasm host, encrypted filesystem, attestation, and background capabilities the cosigner runs on
 
 ## License
 
@@ -559,6 +559,6 @@ repository-owned deployment code can be inspected and used under those terms. Th
 crates it shares with this repository are [vtxos/cosigner](https://github.com/vtxos/cosigner)'s.
 
 Third-party dependencies retain their own licenses. The runtime lives in its separate
-[Apache-2.0-declared workspace](https://github.com/BitspendPayment/enclave-runtime/blob/merkle-block-store/Cargo.toml).
+[Apache-2.0-declared workspace](https://github.com/vtxos/runtime/blob/main/Cargo.toml).
 Every dependency retains its upstream licensing; this repository's MIT license does not replace
 it.

@@ -372,7 +372,7 @@ class MpcService extends ChangeNotifier {
       }
     }
 
-    final enrolment = await gate.enrol(_passkey!, displayName: 'Merlin');
+    final enrolment = await gate.enrol(_passkey!, displayName: 'vtxos');
     await _identityBox!.put('passkeyCredentialId', enrolment.credentialId);
     await _identityBox!.put('tenantId', enrolment.tenantId);
     // The DKG that follows is its first use, and waits for it to become findable — see

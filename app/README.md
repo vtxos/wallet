@@ -1,4 +1,4 @@
-# Merlin Wallet Flutter app
+# vtxos Flutter app
 
 The Android app holds Bitcoin as Ark VTXOs. It uses `../core` for wallet
 operations and `../protocol` for shared messages.
@@ -19,7 +19,7 @@ does not provide direct on-chain spending or broadcast a complete exit path.
 ## Development
 
 See the [repository setup and build instructions](../README.md#build--run) for
-native libraries and backend services, and [vtxos/merlin-infra](https://github.com/vtxos/merlin-infra)
+native libraries and backend services, and [vtxos/infra](https://github.com/vtxos/infra)
 for the MutinyNet deployment. Run Flutter commands from this directory:
 
 ```sh

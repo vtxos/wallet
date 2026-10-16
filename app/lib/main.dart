@@ -57,19 +57,19 @@ void main() async {
           create: (context) => PayoutService(context.read<MpcService>()),
         ),
       ],
-      child: const MerlinWalletApp(),
+      child: const VtxosApp(),
     ),
   );
 }
 
-class MerlinWalletApp extends StatefulWidget {
-  const MerlinWalletApp({super.key});
+class VtxosApp extends StatefulWidget {
+  const VtxosApp({super.key});
 
   @override
-  State<MerlinWalletApp> createState() => _MerlinWalletAppState();
+  State<VtxosApp> createState() => _VtxosAppState();
 }
 
-class _MerlinWalletAppState extends State<MerlinWalletApp> with WidgetsBindingObserver {
+class _VtxosAppState extends State<VtxosApp> with WidgetsBindingObserver {
   GoRouter? _router;
   late final AppLifecycleListener _lifecycle;
 
@@ -118,7 +118,7 @@ class _MerlinWalletAppState extends State<MerlinWalletApp> with WidgetsBindingOb
     // Keep one router instance across app rebuilds.
     _router ??= _buildRouter();
     return MaterialApp.router(
-      title: 'Merlin Wallet',
+      title: 'vtxos',
       theme: AppTheme.darkTheme,
       routerConfig: _router!,
       debugShowCheckedModeBanner: false,
