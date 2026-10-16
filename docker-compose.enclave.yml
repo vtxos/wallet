@@ -1,4 +1,4 @@
-# The dev enclave the e2e runs against: enclave-runtime's QEMU enclave and the released cosigner in
+# The dev enclave the e2e runs against: vtxos/runtime's QEMU enclave and the released cosigner in
 # one image, built by infra (dev-enclave/ there, which this copies). The image is the pin: its
 # org.vtxos.cosigner label must be the release ffi/Cargo.toml names (`make enclave-image`).
 #
@@ -7,7 +7,7 @@
 # vsock_loopback`. Dev only: the Docker socket and the host network make it root on the host.
 services:
   enclave:
-    image: ghcr.io/vtxos/dev-enclave@sha256:8117c95be262c850a3397e824906795202d0694c9c522883430592af78a7bd86
+    image: ghcr.io/vtxos/dev-enclave@sha256:7c5a4344cba8268aa8508fead76c5de0597733f542e9bfca45d31d7ed93eb20e
     # The harness's QEMU, MinIO and Pebble are containers of the host's Docker, so it gets the
     # socket, and they bind-mount by host path, so ENCLAVE_DIR is mounted at its own path. Host
     # networking: the enclave serves on 127.0.0.1:8443, and the cosigner reaches arkd and the
