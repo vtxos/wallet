@@ -20,30 +20,19 @@
 	ffi-build ffi-test ffi-android ffi-android-arm32 ffi-android-x86_64 ffi-android-all \
 	enclave-image cosigner \
 	regtest-up regtest-down bitcoin-init mine-loop adb-reverse \
-	runtime-stop \
-	arkd-up arkd-down arkd-init db-reset \
+	arkd-up arkd-down arkd-init \
 	proto proto-check \
-	flutter flutter-32 flutter-x86 ark-newaddress \
-	stress-test load-test \
-	mutinynet-deploy mutinynet-smoke \
-	e2e-test e2e-ark-test regtest regtest-ark regtest-down \
+	flutter flutter-32 flutter-x86 \
+	mutinynet-smoke \
+	e2e-test e2e-ark-test regtest-ark regtest-down \
 	platform-up platform-down platform-reset send-walkthrough \
 	cli cli-build version \
 	release release-apk release-apk-fat release-testers-add release-testers-remove
 
 # ── Variables ─────────────────────────────────────────────────────────────────
 
-export DATA_DIR=/tmp/mpc_wallet_stress
-# The cosigner's KV store — a directory of files, one per key. Was an embedded SQLite database
-# until the guest port; a directory is the same data structure without the vendored C.
-export STORE_DIR=/tmp/mpc_cosigner/store
-
 NDK_VERSION ?= 27.0.12077973
 NDK_HOME     = $(HOME)/Android/Sdk/ndk/$(NDK_VERSION)
-
-SESSIONS          ?= 10
-CONCURRENCY       ?= 5
-SERVER            ?= 127.0.0.1:7074
 
 # Firebase App Distribution. Read from app/android/app/google-services.json
 # (the com.vtxos.app client's mobilesdk_app_id).
@@ -145,7 +134,7 @@ enclave-image:
 		"but ffi/ builds against $(or $(COSIGNER_RELEASE),no release)" >&2; exit 1; }; \
 	echo "dev enclave image: cosigner $$have"
 
-# The image's cosigner.wasm, for what boots an enclave of its own: up-enclave, mutinynet-deploy.
+# The image's cosigner.wasm, for what boots an enclave of its own: up-enclave.
 cosigner: .cosigner/cosigner.wasm
 
 .cosigner/cosigner.wasm: docker-compose.enclave.yml
@@ -308,29 +297,11 @@ adb-reverse:
 	@echo "Forwarding active: phone 127.0.0.1:50001 -> Electrs"
 	@echo "Forwarding active: phone 127.0.0.1:7200 -> MerlinPlatform"
 
-runtime-stop:
-	@echo "Stopping MPC Wallet Server..."
-	-sudo fuser -k 7074/tcp || true
-	-sudo pkill -9 -f "target/release/cosigner" || true
-	-sudo pkill -9 -f "cosigner" || true
-	-sudo pkill -9 cosigner || true
-	sudo rm -rf $(DATA_DIR) || true
-	@sleep 2
-
 arkd-up:
 	@echo "Starting regtest + arkd (ASP) services..."
 	docker compose -f docker-compose.yml -f docker-compose.ark.yml up -d
 	@echo "Waiting for arkd to start (30s)..."
 	@sleep 30
-
-# Reset the cosigner's SQLite KV file for a clean test run. The reset is per-target
-# (NOT on runtime restart), so the `sealed_state` snapshot survives the ark_e2e restart — the
-# same guarantee the old FLUSHALL-on-redis-up gave. The whole store is one directory now, so
-# resetting it is removing that directory rather than a file and SQLite's two sidecars.
-db-reset:
-	@rm -rf $(STORE_DIR)
-	@mkdir -p $(STORE_DIR)
-	@echo "cosigner store reset ($(STORE_DIR))"
 
 arkd-down:
 	@echo "Stopping arkd services..."
@@ -412,40 +383,15 @@ flutter-32: ffi-android-all
 flutter-x86: ffi-android-x86_64
 	@$(FLUTTER_RUN)
 
-ark-newaddress:
-	@cd e2e && dart run bin/ark_newaddress.dart
-
-# ═══════════════════════════════════════════════════════════════════════════════
-#  STRESS / LOAD TESTING
-# ═══════════════════════════════════════════════════════════════════════════════
-
-stress-test: runtime-stop regtest-up bitcoin-init runtime-run
-	@echo "Running Multi-User E2E Stress Test..."
-	cd e2e && dart test test/multi_user_stress_test.dart
-	@$(MAKE) runtime-stop
-
-load-test: runtime-stop regtest-up bitcoin-init runtime-run
-	@echo "Running Dart Load Tester (sessions=$(SESSIONS), concurrency=$(CONCURRENCY))..."
-	cd e2e && dart pub get && \
-		dart run bin/load_tester.dart \
-			--server $(SERVER) \
-			--sessions $(SESSIONS) \
-			--concurrency $(CONCURRENCY)
-	@$(MAKE) runtime-stop
-
 # ═══════════════════════════════════════════════════════════════════════════════
 #  SIGNET / MUTINYNET
 # ═══════════════════════════════════════════════════════════════════════════════
-
-# The cosigner on MutinyNet: an emulated enclave on EC2 at mutiny.vtxos.network. Test coins only —
-# see infrastructure/mutinynet-qemu/README.md for the whole runbook, including the first deploy.
-mutinynet-deploy:
-	infrastructure/mutinynet-qemu/deploy.sh
 
 # Against the live host: attestation, two wallets, DKG. With MUTINYNET_FUNDER_KEY set, also board,
 # send and read history — which spends a little signet from that key.
 mutinynet-smoke: ffi-build
 	cd e2e && dart run bin/mutinynet_smoke.dart
+
 # ═══════════════════════════════════════════════════════════════════════════════
 #  CLI — regtest REPL wallet
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -480,8 +426,7 @@ cli-build:
 
 e2e-test: e2e
 e2e-ark-test: e2e
-regtest: regtest-up bitcoin-init runtime-run
-regtest-ark: runtime-stop arkd-up bitcoin-init arkd-init platform-up
+regtest-ark: arkd-up bitcoin-init arkd-init platform-up
 regtest-down: down
 
 # ═══════════════════════════════════════════════════════════════════════════════

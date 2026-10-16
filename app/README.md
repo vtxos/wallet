@@ -19,8 +19,8 @@ does not provide direct on-chain spending or broadcast a complete exit path.
 ## Development
 
 See the [repository setup and build instructions](../README.md#build--run) for
-native libraries and backend services, and the [Mutinynet runbook](../infrastructure/mutinynet-qemu/README.md)
-for that deployment. Run Flutter commands from this directory:
+native libraries and backend services, and [vtxos/merlin-infra](https://github.com/vtxos/merlin-infra)
+for the MutinyNet deployment. Run Flutter commands from this directory:
 
 ```sh
 flutter pub get

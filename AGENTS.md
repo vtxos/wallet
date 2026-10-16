@@ -14,8 +14,9 @@
   checked in** — run `make proto`.
 - `ffi/` the merged native library the Dart side loads (`make ffi-build`), over the cosigner's
   `threshold`, `ark` and `enclave-client`.
-- `e2e/` the enclave end-to-end suite and its harness; `cli/` a Dart REPL against a dev enclave;
-  `infrastructure/` the MutinyNet QEMU deployment; `scripts/` what the Makefile calls.
+- `e2e/` the enclave end-to-end suite and its harness; `cli/` a Dart REPL against a dev enclave,
+  and Bob (`cli/bin/bob.dart`); `scripts/` what the Makefile calls. The MutinyNet deployment is
+  vtxos/merlin-infra's.
 
 ## Build, Test, and Development Commands
 - `make proto` regenerate Dart stubs (needs `protoc` and `dart pub global activate protoc_plugin

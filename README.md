@@ -243,14 +243,13 @@ Built, tested and released in [vtxos/cosigner](https://github.com/vtxos/cosigner
 
 ### MutinyNet development deployment
 
-The [MutinyNet runbook](infrastructure/mutinynet-qemu/README.md) describes a QEMU enclave on EC2, public-domain ACME, the external ASP, retained MinIO storage, real wakes through AWS End User Messaging Push, and republished client pins. After completing its prerequisites and infrastructure setup, from the repository root:
+The MutinyNet deployment is [vtxos/merlin-infra](https://github.com/vtxos/merlin-infra)'s: the released cosigner in a Nitro enclave, and its runbook. Against it, from the repository root:
 
 ```bash
-make mutinynet-deploy
 make mutinynet-smoke
 ```
 
-The smoke command checks attestation, separate wallets, and DKG; its funded path uses the explicitly configured test-network funder. Deployment uploads artifacts and changes remote services, so follow the runbook before invoking it. This is a test-network deployment. Real Nitro/KMS deployment is a separate integration and validation step, not a property conferred by running QEMU on EC2.
+The smoke command checks attestation, separate wallets, and DKG; its funded path uses the explicitly configured test-network funder. This is a test network.
 
 ## Testing
 
@@ -288,7 +287,6 @@ CI (`.github/workflows/ci.yml`) runs the FFI's `cargo test`, every Dart package'
 | [`protocol/`](protocol/) | Protobuf contracts and generated Dart messages/stubs. |
 | [`cli/`](cli/) | Regtest wallet REPL using software passkeys and the same client core; `bin/bob.dart` is Bob, the integration test's counterparty (`make bob-up`). |
 | [`e2e/`](e2e/) | QEMU harness, regtest integration scenarios, and test escrow service. |
-| [`infrastructure/mutinynet-qemu/`](infrastructure/mutinynet-qemu/) | Current emulated-enclave deployment and runbook. |
 | [`scripts/`](scripts/) | Component builds, interface checks, local stack startup, and development helpers. |
 
 The runtime is maintained in its [separate repository](https://github.com/BitspendPayment/enclave-runtime). It owns the measured host and storage machinery; Merlin owns the application component and wallet clients.
@@ -446,8 +444,8 @@ it prevents new signatures and share reconstruction unless an adequate recovery/
 exists. The phone's public state does not replace the cosigner's share or dealt contribution.
 Saved exits remain useful only for the specific outputs and destination they cover.
 
-The [MutinyNet deployment](infrastructure/mutinynet-qemu/) uses an emulated enclave. Its operator
-controls the development storage key and the attestation signing chain. The client exercises its
+The dev enclave `make up` and the e2e run is emulated. Its operator controls the development
+storage key and the attestation signing chain. The client exercises its
 verification path against configured emulator pins; this does not establish confidentiality or
 independent code identity against that operator.
 
