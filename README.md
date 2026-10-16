@@ -286,11 +286,10 @@ CI (`.github/workflows/ci.yml`) runs the FFI's `cargo test`, every Dart package'
 | [`crates/enclave-client/`](https://github.com/vtxos/cosigner/blob/main/crates/enclave-client/) | Rust attestation verification used by the client through FFI. |
 | [`ffi/`](ffi/) | The merged C ABI for threshold, Ark, and enclave functionality. |
 | [`protocol/`](protocol/) | Protobuf contracts and generated Dart messages/stubs. |
-| [`cli/`](cli/) | Regtest wallet REPL using software passkeys and the same client core. |
+| [`cli/`](cli/) | Regtest wallet REPL using software passkeys and the same client core; `bin/bob.dart` is Bob, the integration test's counterparty (`make bob-up`). |
 | [`e2e/`](e2e/) | QEMU harness, regtest integration scenarios, and test escrow service. |
 | [`infrastructure/mutinynet-qemu/`](infrastructure/mutinynet-qemu/) | Current emulated-enclave deployment and runbook. |
 | [`scripts/`](scripts/) | Component builds, interface checks, local stack startup, and development helpers. |
-| [`third_party/rust-sdk/`](third_party/rust-sdk/) | Ark SDK submodule and its own upstream license. |
 
 The runtime is maintained in its [separate repository](https://github.com/BitspendPayment/enclave-runtime). It owns the measured host and storage machinery; Merlin owns the application component and wallet clients.
 
@@ -557,11 +556,11 @@ exits remain the implemented mechanism while this broader path is unfinished.
 
 ## License
 
-This repository is [MIT-licensed](LICENSE). The client, cosigner component, threshold library,
-and repository-owned deployment code can be inspected and used under those terms.
+This repository is [MIT-licensed](LICENSE). The app, the client core, the FFI and
+repository-owned deployment code can be inspected and used under those terms. The cosigner and the
+crates it shares with this repository are [vtxos/cosigner](https://github.com/vtxos/cosigner)'s.
 
 Third-party dependencies retain their own licenses. The runtime lives in its separate
 [Apache-2.0-declared workspace](https://github.com/BitspendPayment/enclave-runtime/blob/merkle-block-store/Cargo.toml).
-The [`third_party/rust-sdk`](third_party/rust-sdk/) submodule and vendored crates under
-[`cosigner/vendor`](https://github.com/vtxos/cosigner/blob/main/cosigner/vendor/) retain their upstream licensing; this repository's MIT
-license does not replace it.
+Every dependency retains its upstream licensing; this repository's MIT license does not replace
+it.

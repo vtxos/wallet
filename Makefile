@@ -209,28 +209,27 @@ platform-reset: platform-down
 send-walkthrough: enclave-image $(FFI_DEP) platform-reset regtest-ark
 	cd e2e && dart pub get && ENCLAVE_RUNTIME=$(ENCLAVE_RUNTIME) dart run bin/send_walkthrough.dart
 
-# Bring up Bob — ark-sample wallet that acts as counter-party for the Flutter
-# integration test. Requires arkd already running (call after arkd-init).
-bob-up:
-	@./scripts/bob_setup.sh
-	@echo "==> Starting bob_proxy on :7090..."
-	-pkill -f bob_proxy || true
-	@nohup python3 scripts/bob_proxy.py > /tmp/bob_proxy.log 2>&1 &
-	@sleep 1
-	@curl -sf http://127.0.0.1:7090/ark-address | head -c 200 && echo
+# Bob, the counterparty the Flutter integration test pays and is paid by: a CLI wallet on the dev
+# enclave the app uses, behind HTTP on :7090 (cli/bin/bob.dart). Needs `make up` running. The first
+# start creates and funds him; later ones reopen him.
+bob-up: ffi-build
+	-pkill -f '[b]in/bob.dart' || true
+	@cd cli && dart pub get >/dev/null && \
+		VTXOS_ENCLAVE_RUN=$(or $(ENCLAVE_RUN),$(CLI_ENCLAVE_RUN)) ENCLAVE_RUNTIME=$(ENCLAVE_CHECKOUT) \
+		nohup dart run bin/bob.dart > /tmp/bob.log 2>&1 &
+	@echo "==> Bob is starting (log: /tmp/bob.log)..."
+	@for i in $$(seq 120); do curl -sf http://127.0.0.1:7090/ark-address && echo && exit 0; sleep 2; done; \
+		echo "Bob did not come up; see /tmp/bob.log" >&2; exit 1
 
 bob-down:
-	-pkill -f bob_proxy || true
-	-sudo fuser -k 7090/tcp 2>/dev/null || true
+	-pkill -f '[b]in/bob.dart' || true
 
-# Send a VTXO from Bob to any ark address. Requires bob-up to have run first.
+# Send from Bob to any ark address. Requires bob-up.
 # Usage: make bob-send ADDR=tark1... [AMT=50000]
 bob-send:
 	@test -n "$(ADDR)" || { echo "ADDR=<ark address> required (e.g. make bob-send ADDR=tark1... AMT=50000)"; exit 1; }
-	$${RUST_SDK_DIR:-third_party/rust-sdk}/target/release/ark-client-sample \
-		--config $${BOB_DIR:-/tmp/bob_ark}/ark.config.toml \
-		--seed $${BOB_DIR:-/tmp/bob_ark}/ark.seed \
-		send-to-ark-addresses "$(ADDR),$(or $(AMT),50000)"
+	@curl -sf -X POST http://127.0.0.1:7090/send -H 'content-type: application/json' \
+		-d '{"address":"$(ADDR)","amount_sats":$(or $(AMT),50000)}' && echo
 
 # ═══════════════════════════════════════════════════════════════════════════════
 #  BUILD TARGETS

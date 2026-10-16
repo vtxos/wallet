@@ -118,11 +118,8 @@ class Cli {
         print(await w.client.getBoardingAddress());
       case 'fund':
         final sats = _sats(rest, 0);
-        final (_, w) = await _active();
-        final address = await w.client.getBoardingAddress();
-        print('bitcoind → $address  $sats sats: ${await bitcoind.send(address, sats)}');
-        await bitcoind.mine();
-        await _board(w.client, minSats: sats);
+        final (name, _) = await _active();
+        await fund(name, sats);
       case 'board':
         final (_, w) = await _active();
         await _board(w.client);
@@ -160,13 +157,31 @@ class Cli {
     return true;
   }
 
+  /// [name]'s client, opened from what this machine stores about it.
+  Future<MpcClient> client(String name) async => (await _wallet(name)).client;
+
+  /// bitcoind pays [name]'s boarding address [sats], and the deposit is boarded into Ark.
+  Future<void> fund(String name, int sats) async {
+    final client = (await _wallet(name)).client;
+    final address = await client.getBoardingAddress();
+    print('bitcoind → $address  $sats sats: ${await bitcoind.send(address, sats)}');
+    await bitcoind.mine();
+    await _board(client, minSats: sats);
+  }
+
   Future<void> _new(String name) async {
+    await create(name);
+    home.active = name;
+    home.save();
+  }
+
+  /// Enrol a passkey for [name] — a new tenant — and run DKG. The active wallet stays as it was.
+  Future<void> create(String name) async {
     if (home.wallets.containsKey(name)) throw StateError('$name already exists');
     final passkey = home.passkey(name);
     print('enrolling a passkey for $name (a new tenant)…');
     await enclave.enrol(passkey);
     home.wallets[name] = WalletRecord(name);
-    home.active = name;
     home.save();
 
     final w = await _wallet(name);

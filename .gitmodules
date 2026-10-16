@@ -1,3 +1,0 @@
-[submodule "third_party/rust-sdk"]
-	path = third_party/rust-sdk
-	url = https://github.com/arkade-os/rust-sdk.git

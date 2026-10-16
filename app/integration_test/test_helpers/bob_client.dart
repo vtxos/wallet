@@ -2,9 +2,9 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
-/// HTTP client for `scripts/bob_proxy.py` running on the host. The emulator
-/// reaches the host via `10.0.2.2`. Bob is an `ark-sample`-backed wallet that
-/// acts as the counter-party for the integration test's Ark send/receive.
+/// HTTP client for Bob (`cli/bin/bob.dart`, `make bob-up`) running on the host. The emulator
+/// reaches the host via `10.0.2.2`. Bob is a CLI wallet on the same dev enclave, the counterparty
+/// for the integration test's Ark send/receive.
 class BobClient {
   final String _base;
   BobClient({String host = '10.0.2.2', int port = 7090})
