@@ -1,0 +1,21 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application android:label="Test passkeys">
+        <service
+            android:name=".TestPasskeyService"
+            android:exported="true"
+            android:label="Test passkeys"
+            android:permission="android.permission.BIND_CREDENTIAL_PROVIDER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.credentials.CredentialProviderService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.credentials.provider"
+                android:resource="@xml/provider" />
+        </service>
+        <!-- Started by Credential Manager through the entries' PendingIntents; it shows nothing. -->
+        <activity
+            android:name=".PasskeyActivity"
+            android:exported="false"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+    </application>
+</manifest>

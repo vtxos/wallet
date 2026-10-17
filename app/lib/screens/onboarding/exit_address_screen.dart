@@ -87,7 +87,7 @@ class _ExitAddressScreenState extends State<ExitAddressScreen> {
                 controller: _controller,
                 autocorrect: false,
                 enableSuggestions: false,
-                style: GoogleFonts.robotoMono(color: Colors.white, fontSize: 13),
+                style: GoogleFonts.firaCode(color: Colors.white, fontSize: 13),
                 decoration: InputDecoration(
                   labelText: 'Bitcoin address',
                   errorText: _error,

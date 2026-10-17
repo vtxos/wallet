@@ -7,7 +7,7 @@
 # vsock_loopback`. Dev only: the Docker socket and the host network make it root on the host.
 services:
   enclave:
-    image: ghcr.io/vtxos/dev-enclave@sha256:7c5a4344cba8268aa8508fead76c5de0597733f542e9bfca45d31d7ed93eb20e
+    image: ghcr.io/vtxos/dev-enclave@sha256:07d2adfdf3345d35255225a4694e2f16ab7c665ca5123b835c7831ab5c3a3d52
     # The harness's QEMU, MinIO and Pebble are containers of the host's Docker, so it gets the
     # socket, and they bind-mount by host path, so ENCLAVE_DIR is mounted at its own path. Host
     # networking: the enclave serves on 127.0.0.1:8443, and the cosigner reaches arkd and the
@@ -27,4 +27,6 @@ services:
       ENCLAVE_DIR: ${ENCLAVE_DIR}
       GUEST_ENV: ${GUEST_ENV:-}
       GUEST: ${GUEST:-}
+      # `app`: the bundle built for the app (rp id vtxos.com), as scripts/e2e-all.sh boots it.
+      ENCLAVE_BUNDLE: ${ENCLAVE_BUNDLE:-}
       ZFS_SIZE: ${ZFS_SIZE:-4G}

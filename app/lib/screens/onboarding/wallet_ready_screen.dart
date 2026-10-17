@@ -66,8 +66,8 @@ class WalletReadyScreen extends StatelessWidget {
                     Text(
                       context.watch<MpcService>().exitAddress ?? 'not set',
                       textAlign: TextAlign.center,
-                      style: GoogleFonts.robotoMono(
-                          fontWeight: FontWeight.bold, fontSize: 11),
+                      style: GoogleFonts.firaCode(
+                          fontWeight: FontWeight.w500, fontSize: 11),
                     ),
                   ],
                 ),

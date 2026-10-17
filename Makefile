@@ -2,7 +2,7 @@
 #  MPC Wallet — Makefile
 #
 #  Primary commands:
-#    make e2e     Run the Ark E2E suite against a real enclave (alias for e2e-enclave)
+#    make e2e     Every e2e, on an Android emulator against a real enclave (alias for e2e-all)
 #    make up      Regtest + arkd, and the cosigner in a QEMU enclave, in the foreground
 #    make down    Stop everything
 #
@@ -15,7 +15,7 @@
 #    make release-testers-remove TESTERS="a@x.com"
 # ═══════════════════════════════════════════════════════════════════════════════
 
-.PHONY: e2e e2e-enclave up up-enclave down down-enclave \
+.PHONY: e2e e2e-all up up-enclave down down-enclave \
 	bob-up bob-down bob-send \
 	ffi-build ffi-test ffi-android ffi-android-arm32 ffi-android-x86_64 ffi-android-all \
 	enclave-image cosigner \
@@ -81,27 +81,14 @@ version:
 #  PRIMARY COMMANDS
 # ═══════════════════════════════════════════════════════════════════════════════
 
-# The Ark E2E suite, against the cosigner component inside a real enclave.
-e2e: e2e-enclave
+# Every e2e, from an Android emulator: the cosigner has no native server, so this is the only way
+# it is exercised end to end. It runs under the runtime's QEMU Nitro enclave, and every call goes
+# through TLS, a nonce and a WebAuthn assertion, made through Credential Manager exactly as on a
+# phone. See scripts/e2e-all.sh.
+e2e: e2e-all
 
-# The cosigner has no native server, so this is the only way it is exercised end to end: the
-# component runs under enclave-runtime's QEMU Nitro enclave, and every call goes through TLS, a
-# nonce and a WebAuthn assertion exactly as a phone's would.
-#
-# Two ways to run it:
-#
-#   make e2e-enclave
-#       Starts the dev enclave image (docker-compose.enclave.yml) for the run and stops it after:
-#       enclave-runtime's QEMU enclave and the released cosigner in one container, built by infra.
-#       The --timeout covers that boot, which happens in setUpAll and is otherwise held to
-#       package:test's 30-second default. Tests that do real work set their own.
-#       COSIGNER_WASM=path serves a local cosigner build in it instead of the image's.
-#
-#   make e2e-enclave ENCLAVE_RUN=$$HOME/enclave-runtime/target/qemu-nitro/vtxos
-#       Attaches to one already up — the developer loop, e.g. `make up-enclave` in another terminal.
-#
 # One enclave at a time: its MinIO port and vsock CID are fixed. The image's cosigner must be the
-# release ffi/ builds against, or the protos this suite speaks are not the ones it serves.
+# release ffi/ builds against, or the protos the app speaks are not the ones it serves.
 DEV_ENCLAVE_IMAGE = $(shell sed -n 's/^ *image: *//p' docker-compose.enclave.yml)
 # The runtime's harness, as the image copies it into .enclave-run/ when it starts.
 ENCLAVE_RUNTIME ?= $(CURDIR)/.enclave-run/bundle
@@ -109,19 +96,17 @@ ENCLAVE_RUNTIME ?= $(CURDIR)/.enclave-run/bundle
 # and origins, which a prebuilt image cannot take.
 ENCLAVE_CHECKOUT ?= $(HOME)/enclave-runtime
 ENCLAVE_RUN     ?=
-E2E_TIMEOUT     ?= 30m
 # The emulated enclave's pool disk. The runtime gives every tenant its own ZFS pool in a fixed
-# 200 MiB region of it, and the bundle's default 4 GiB holds about 17. This suite enrols about 30,
+# 200 MiB region of it, and the bundle's default 4 GiB holds about 17. The e2e enrols about 30,
 # so the rest were refused. The image is sparse, so the size costs nothing until it is written.
 E2E_ZFS_SIZE    ?= 16G
 # CI builds the FFI once, in its own job, and hands the library over; it sets this empty.
 FFI_DEP         ?= ffi-build
 
-e2e-enclave: $(if $(ENCLAVE_RUN),,enclave-image) $(FFI_DEP) arkd-up bitcoin-init arkd-init
-	@echo "Running the Ark E2E suite against the enclave$(if $(ENCLAVE_RUN), at $(ENCLAVE_RUN), booting one)..."
-	cd e2e && dart pub get && \
-		ENCLAVE_RUNTIME=$(ENCLAVE_RUNTIME) VTXOS_ENCLAVE_RUN=$(ENCLAVE_RUN) ZFS_SIZE=$(E2E_ZFS_SIZE) \
-		dart test test/enclave_ark_test.dart --timeout $(E2E_TIMEOUT) --reporter expanded
+# Start an emulator first (API 34 or later). The host's FFI is for deriving the services' identifiers
+# the cosigner is configured with; the emulator's is the app's.
+e2e-all: enclave-image $(FFI_DEP) arkd-up bitcoin-init arkd-init ffi-android-x86_64
+	E2E_ZFS_SIZE=$(E2E_ZFS_SIZE) ./scripts/e2e-all.sh
 
 # The cosigner release ffi/ builds against: the tag its Cargo.toml names for vtxos/cosigner.
 COSIGNER_RELEASE = $(shell sed -n 's|.*"https://github.com/vtxos/cosigner", tag = "\([^"]*\)".*|\1|p' ffi/Cargo.toml | sort -u)
@@ -147,7 +132,6 @@ cosigner: .cosigner/cosigner.wasm
 # foreground until Ctrl-C. Everything else attaches to it:
 #
 #   make cli                                                   a wallet REPL
-#   make e2e-enclave ENCLAVE_RUN=$(ENCLAVE_CHECKOUT)/target/qemu-nitro/$(ENCLAVE_NAME)
 #   make flutter                                               the app, pinned to this boot
 #
 # The store is kept between starts — tenants, passkeys and wallets survive a restart and a cosigner
@@ -400,7 +384,7 @@ mutinynet-smoke: ffi-build
 # board and send. Every call is approved by a passkey and every approval attests the enclave,
 # exactly as in the e2e suite — it is the same wiring.
 #
-# Needs a dev enclave up (see e2e-enclave) and the regtest stack (arkd-up, bitcoin-init, arkd-init).
+# Needs a dev enclave up (`make up`) and the regtest stack (arkd-up, bitcoin-init, arkd-init).
 #
 # REGTEST ONLY. Passkeys and FROST shares are plaintext, under ~/.merlin-cli/enclaves/<boot>/ — one
 # directory per enclave boot, since a reboot starts the store from nothing.
