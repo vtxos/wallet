@@ -90,9 +90,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # Pinned: the Flutter the app is built with. Stable moves on its own, and 3.47 refuses this
+      # project's Gradle 8.12 — moving to it means the Gradle and AGP upgrade it asks for.
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
+          flutter-version: '3.44.3'
       - name: Install protoc and the Dart plugin
         run: |
           sudo apt-get update && sudo apt-get install -y protobuf-compiler
@@ -131,9 +134,12 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+      # Pinned: the Flutter the app is built with. Stable moves on its own, and 3.47 refuses this
+      # project's Gradle 8.12 — moving to it means the Gradle and AGP upgrade it asks for.
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
+          flutter-version: '3.44.3'
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: x86_64-linux-android
