@@ -176,6 +176,12 @@ jobs:
             sudo udevadm trigger --name-match=kvm
           fi
           [ -e /dev/vsock ] || sudo modprobe vsock_loopback
+      # The runner is 16 GB for an emulator, the enclave's VM, the regtest stack and Gradle: a daemon
+      # that outlives each build holds 4 GB for nothing.
+      - name: Gradle without a daemon
+        run: |
+          mkdir -p ~/.gradle
+          printf 'org.gradle.daemon=false\nkotlin.compiler.execution.strategy=in-process\n' >> ~/.gradle/gradle.properties
       # The image Play services draws Credential Manager's sheet on, as on a phone. Without Wi-Fi:
       # the emulator's is netsim's, which on a runner comes up with no route even to the host at
       # 10.0.2.2 ("Network is unreachable"); mobile data is the emulator's own network, and has one.
@@ -187,7 +193,11 @@ jobs:
           arch: x86_64
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -feature -Wifi
-          script: make e2e-all NDK_HOME="$ANDROID_NDK_LATEST_HOME" MERLIN_PLATFORM="$GITHUB_WORKSPACE/platform"
+          script: E2E_TEST_TIMEOUT=40m make e2e-all NDK_HOME="$ANDROID_NDK_LATEST_HOME" MERLIN_PLATFORM="$GITHUB_WORKSPACE/platform"
+      # What the kernel did, the OOM killer above all, for a run that stopped without a word.
+      - name: The kernel's log
+        if: failure()
+        run: sudo dmesg -T | tail -400 > .enclave-run/dmesg.txt || true
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
@@ -195,4 +205,6 @@ jobs:
           path: |
             .enclave-run/bundle/target/qemu-nitro/vtxos/*.log
             .enclave-run/logcat.txt
+            .enclave-run/health.txt
+            .enclave-run/dmesg.txt
             .platform/run/*.log

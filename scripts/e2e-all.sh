@@ -41,8 +41,8 @@ if [[ -n "${COSIGNER_WASM:-}" ]]; then
 fi
 # By its full path: the trap that takes it down runs from wherever the script has got to.
 compose=(docker compose -f "$repo/docker-compose.enclave.yml")
-miner="" approver="" logcat=""
-trap 'kill $miner $approver $logcat 2>/dev/null || true; "${compose[@]}" down >/dev/null 2>&1 || true' EXIT
+miner="" approver="" logcat="" health=""
+trap 'kill $miner $approver $logcat $health 2>/dev/null || true; "${compose[@]}" down >/dev/null 2>&1 || true' EXIT
 "${compose[@]}" up -d --wait --wait-timeout 1500 || { "${compose[@]}" logs --tail 80; exit 1; }
 run="$ENCLAVE_DIR/bundle/target/qemu-nitro/vtxos"
 scripts/platform.sh pins "$run"
@@ -65,6 +65,13 @@ approver=$!
 adb -s "$serial" logcat -c
 adb -s "$serial" logcat >"$ENCLAVE_DIR/logcat.txt" 2>&1 &
 logcat=$!
+# And the host's: memory, load, and whether adb still has the emulator, every half minute.
+(while true; do
+    echo "$(date -u +%T) $(free -m | awk '/^Mem/ {print "used " $3 "M avail " $7 "M"}')" \
+         "load $(cut -d' ' -f1 /proc/loadavg) adb $(adb -s "$serial" get-state 2>&1)"
+    sleep 30
+done) >"$ENCLAVE_DIR/health.txt" 2>&1 &
+health=$!
 
 # This boot's pins, and the component it serves, which the device cannot read for itself.
 defines="$(scripts/dev-enclave-defines.sh "$run")"
