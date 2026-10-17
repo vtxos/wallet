@@ -41,9 +41,9 @@ scripts/platform.sh pins "$run"
 (while true; do scripts/bitcoin.sh mine >/dev/null 2>&1 || true; sleep 10; done) &
 miner=$!
 
-# The emulator's passkey provider is the test one. `flutter pub get` writes the
-# android/local.properties Gradle reads.
-(cd app && flutter pub get >/dev/null)
+# The emulator's passkey provider is the test one, built with the app's Gradle. Flutter generates
+# the wrapper and android/local.properties; neither is checked in.
+(cd app && flutter build apk --config-only >/dev/null)
 (cd app/android && ./gradlew -q :testpasskey:assembleDebug)
 adb -s "$serial" install -r -t app/build/testpasskey/outputs/apk/debug/testpasskey-debug.apk
 provider=com.vtxos.testpasskey/com.vtxos.testpasskey.TestPasskeyService
