@@ -120,7 +120,6 @@ hints() {
   run dir    $run
 
   CLI        make cli                                   (wallets under ~/.merlin-cli/enclaves/<boot>/)
-  e2e        make e2e-enclave ENCLAVE_RUN=$run
   app        make adb-reverse && make flutter           (pins this boot's root and PCRs into the build)
   rp id      ${rp_id:-enclave.test}
   ASP        $asp_origin

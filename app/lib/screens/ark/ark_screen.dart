@@ -136,7 +136,7 @@ class ArkScreen extends StatelessWidget {
           const SizedBox(height: 2),
           Text(
             hex,
-            style: GoogleFonts.robotoMono(fontSize: 10, color: Colors.white60),
+            style: GoogleFonts.firaCode(fontSize: 10, color: Colors.white60),
           ),
         ],
       ),

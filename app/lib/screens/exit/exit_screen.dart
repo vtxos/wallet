@@ -106,7 +106,7 @@ class ExitScreen extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   address ?? 'Not set — nothing can be pre-signed',
-                  style: GoogleFonts.robotoMono(
+                  style: GoogleFonts.firaCode(
                       color:
                           address == null ? Colors.orangeAccent : Colors.white,
                       fontSize: 12),
@@ -237,7 +237,7 @@ class ExitScreen extends StatelessWidget {
           const SizedBox(height: 4),
           Text('from ${_short(exit.outpoint)}',
               style:
-                  GoogleFonts.robotoMono(color: Colors.white38, fontSize: 11)),
+                  GoogleFonts.firaCode(color: Colors.white38, fontSize: 11)),
           const SizedBox(height: 8),
           Row(
             children: [
@@ -367,44 +367,49 @@ class _ExitPathState extends State<_ExitPath> {
 
   @override
   Widget build(BuildContext context) {
-    return Theme(
-      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-      child: ExpansionTile(
-        key: const Key('exitPathTile'),
-        tilePadding: EdgeInsets.zero,
-        childrenPadding: const EdgeInsets.only(bottom: 8),
-        title: Text('The full path on-chain',
-            style: GoogleFonts.inter(color: Colors.white70, fontSize: 12)),
-        // Asked for only when opened: it is a call to the ASP's indexer, and most of the time
-        // nobody needs it.
-        onExpansionChanged: (open) {
-          if (open && _chain == null) {
-            setState(() =>
-                _chain = context.read<MpcService>().exitChain(widget.exit));
-          }
-        },
-        children: [
-          FutureBuilder<ExitChain>(
-            future: _chain,
-            builder: (context, snapshot) {
-              if (snapshot.connectionState != ConnectionState.done) {
-                return const Padding(
-                  padding: EdgeInsets.all(12),
-                  child: SizedBox(
-                      height: 18,
-                      width: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2)),
-                );
-              }
-              if (snapshot.hasError) {
-                return Text('Could not read the path: ${snapshot.error}',
-                    style: GoogleFonts.inter(
-                        color: Colors.orangeAccent, fontSize: 11));
-              }
-              return _path(context, snapshot.data!);
-            },
-          ),
-        ],
+    // Its own Material: the exit's card is a coloured box, which would hide the tile's ink — and
+    // Flutter asserts that it does, so a debug build threw on opening the Exit tab.
+    return Material(
+      type: MaterialType.transparency,
+      child: Theme(
+        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          key: const Key('exitPathTile'),
+          tilePadding: EdgeInsets.zero,
+          childrenPadding: const EdgeInsets.only(bottom: 8),
+          title: Text('The full path on-chain',
+              style: GoogleFonts.inter(color: Colors.white70, fontSize: 12)),
+          // Asked for only when opened: it is a call to the ASP's indexer, and most of the time
+          // nobody needs it.
+          onExpansionChanged: (open) {
+            if (open && _chain == null) {
+              setState(() =>
+                  _chain = context.read<MpcService>().exitChain(widget.exit));
+            }
+          },
+          children: [
+            FutureBuilder<ExitChain>(
+              future: _chain,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState != ConnectionState.done) {
+                  return const Padding(
+                    padding: EdgeInsets.all(12),
+                    child: SizedBox(
+                        height: 18,
+                        width: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2)),
+                  );
+                }
+                if (snapshot.hasError) {
+                  return Text('Could not read the path: ${snapshot.error}',
+                      style: GoogleFonts.inter(
+                          color: Colors.orangeAccent, fontSize: 11));
+                }
+                return _path(context, snapshot.data!);
+              },
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -495,7 +500,7 @@ class _ExitPathState extends State<_ExitPath> {
                     style: GoogleFonts.inter(color: colour, fontSize: 12)),
                 Text(
                   hop.txid.isEmpty ? '(txid unknown)' : _shortTxid(hop.txid),
-                  style: GoogleFonts.robotoMono(
+                  style: GoogleFonts.firaCode(
                       color: Colors.white38, fontSize: 10),
                 ),
               ],

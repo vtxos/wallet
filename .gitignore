@@ -45,7 +45,7 @@ protocol/lib/src/generated/
 # Data
 e2e/hive_db
 
-# Where the dev enclave image runs its harness from, as e2e-enclave starts it (hundreds of MB).
+# Where the dev enclave image runs its harness from, as make e2e starts it (hundreds of MB).
 .enclave-run/
 # The image's cosigner.wasm, as `make cosigner` takes it out.
 .cosigner/

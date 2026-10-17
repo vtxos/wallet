@@ -30,7 +30,7 @@ class SettingsScreen extends StatelessWidget {
               subtitle: Text(
                 mpc.exitAddress ??
                     'Not set — without one, nothing can be pre-signed for you to broadcast',
-                style: GoogleFonts.robotoMono(color: Colors.white54, fontSize: 11),
+                style: GoogleFonts.firaCode(color: Colors.white54, fontSize: 11),
               ),
               trailing: const Icon(Icons.edit, size: 18),
               onTap: () => _editExitAddress(context, mpc),
@@ -83,7 +83,7 @@ class SettingsScreen extends StatelessWidget {
               controller: controller,
               autocorrect: false,
               enableSuggestions: false,
-              style: GoogleFonts.robotoMono(color: Colors.white, fontSize: 12),
+              style: GoogleFonts.firaCode(color: Colors.white, fontSize: 12),
               decoration: const InputDecoration(border: OutlineInputBorder()),
             ),
             const SizedBox(height: 8),
