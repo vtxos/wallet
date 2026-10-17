@@ -27,3 +27,5 @@ plugins {
 }
 
 include ":app"
+// A software passkey provider for the emulator e2e, never part of the app: see testpasskey/src/main/kotlin.
+include ":testpasskey"
