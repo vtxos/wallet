@@ -1,4 +1,4 @@
-# Four jobs. Three run on any runner: the FFI crate, every Dart package's analysis and tests, and
+# Five jobs. Three run on any runner: the FFI crate, every Dart package's analysis and tests, and
 # the app under Flutter. The cosigner and the crates the FFI is built on are vtxos/cosigner's, at
 # the release ffi/Cargo.toml names, and tested there; `make proto` takes its protos from the same
 # checkout. The fourth is the enclave e2e — the only
@@ -7,6 +7,10 @@
 # infra) on a hosted runner's KVM, exactly as enclave-runtime's own CI boots one. Nested
 # virtualisation there works but is not something GitHub supports, so that job is the one that can
 # fail for reasons outside this repository; its logs are uploaded when it does.
+#
+# The fifth is the app's: its full flow on an Android emulator, with the passkey taking the real
+# Credential Manager path to a test provider, against the image's app bundle and MerlinPlatform
+# (scripts/e2e-app.sh). It runs on the same KVM, so it can fail for the same outside reasons.
 name: CI
 
 on:
@@ -149,3 +153,70 @@ jobs:
         with:
           name: enclave-e2e-logs
           path: .enclave-run/bundle/target/qemu-nitro/vtxos/*.log
+
+  app-e2e:
+    name: App e2e (emulator, passkey, enclave, platform)
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      # MerlinPlatform, for the payout. scripts/platform.sh refuses one built against another
+      # cosigner release than ffi/'s.
+      - uses: actions/checkout@v4
+        with:
+          repository: vtxos/platform
+          path: platform
+      - name: Make room for an emulator, Gradle and the stack's images
+        run: sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/boost "$AGENT_TOOLSDIRECTORY"
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-linux-android
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ffi/target
+            .platform/build/target
+          key: app-e2e-${{ hashFiles('**/Cargo.lock', '**/Cargo.toml') }}
+          restore-keys: app-e2e-
+      - name: Install protoc and the Dart plugin
+        run: |
+          sudo apt-get update && sudo apt-get install -y protobuf-compiler
+          dart pub global activate protoc_plugin 21.1.2
+      - name: The protocol stubs
+        run: make proto
+      - name: Let this user open KVM, and load the vsock loopback transport
+        # The emulator and the enclave's QEMU both run on the runner's KVM.
+        run: |
+          if [ -e /dev/kvm ] && [ ! -r /dev/kvm ]; then
+            echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+              | sudo tee /etc/udev/rules.d/99-kvm4all.rules >/dev/null
+            sudo udevadm control --reload-rules
+            sudo udevadm trigger --name-match=kvm
+          fi
+          [ -e /dev/vsock ] || sudo modprobe vsock_loopback
+      # The image Play services draws Credential Manager's sheet on, as a phone's.
+      - name: The flow, on an emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis_playstore
+          arch: x86_64
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          script: make e2e-app NDK_HOME="$ANDROID_NDK_LATEST_HOME" MERLIN_PLATFORM="$GITHUB_WORKSPACE/platform"
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: app-e2e-logs
+          path: |
+            .enclave-run/bundle/target/qemu-nitro/vtxos/*.log
+            .platform/run/*.log

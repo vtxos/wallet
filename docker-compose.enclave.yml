@@ -27,4 +27,6 @@ services:
       ENCLAVE_DIR: ${ENCLAVE_DIR}
       GUEST_ENV: ${GUEST_ENV:-}
       GUEST: ${GUEST:-}
+      # `app`: the bundle built for the app (rp id vtxos.com), as scripts/e2e-app.sh boots it.
+      ENCLAVE_BUNDLE: ${ENCLAVE_BUNDLE:-}
       ZFS_SIZE: ${ZFS_SIZE:-4G}
