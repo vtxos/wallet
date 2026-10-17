@@ -191,6 +191,9 @@ jobs:
           api-level: 35
           target: google_apis_playstore
           arch: x86_64
+          # A phone's screen. The default device is a small one, where the app's buttons can sit
+          # under the keyboard or off the bottom, out of reach of a tap.
+          profile: pixel_6
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -feature -Wifi
           script: E2E_TEST_TIMEOUT=40m make e2e-all NDK_HOME="$ANDROID_NDK_LATEST_HOME" MERLIN_PLATFORM="$GITHUB_WORKSPACE/platform"

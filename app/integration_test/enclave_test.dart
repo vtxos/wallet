@@ -9,6 +9,11 @@
 // and the escrow service's own protocol — both halves arriving, a half refused, a payment paying
 // once — which the cosigner's tests prove in isolation, and app_test.dart's payout end to end.
 
+// Each test enrols its passkeys and runs its ceremonies through Credential Manager, a sheet at a
+// time: package:test's 30 seconds is less than two of them take on a CI emulator.
+@Timeout(Duration(minutes: 5))
+library;
+
 import 'dart:typed_data';
 
 import 'package:blockchain_utils/blockchain_utils.dart' show SegwitBech32Encoder;
