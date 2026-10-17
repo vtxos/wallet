@@ -189,6 +189,10 @@ class SendSession {
       throw CosignerException('expected the result, got ${complete.whichBody()}');
     }
     final arkTxid = complete.complete.arkTxid;
+    // Its change, when it has any. The ark transaction's outputs are the recipient, the change and
+    // the anchor, in that order (the cosigner's `SendSession::change_vtxo`).
+    final change =
+        vtxos.fold<int>(0, (sum, v) => sum + v.amountSats) > amountSats ? '$arkTxid:1' : null;
 
     // --- Renew the delegate over what is held now, before closing --------------------------
     final delegate = readHeld == null
@@ -196,9 +200,11 @@ class SendSession {
         : await renewDelegateAfter<Q, R>(
             duplex: duplex,
             // A send spends every input it was given; what remains is its change, and whatever
-            // arrived meanwhile.
-            held: guarded(
-                heldOnceIndexed(readHeld, gone: {for (final v in vtxos) '${v.txid}:${v.vout}'})),
+            // arrived meanwhile. The change has to be indexed, not only the inputs gone: in
+            // between, the set is empty or short of it, looks settled, and the delegate and exits
+            // would be renewed over what is left without it.
+            held: guarded(heldOnceIndexed(readHeld,
+                gone: {for (final v in vtxos) '${v.txid}:${v.vout}'}, arrived: change)),
             info: info,
             resolve: resolve,
             groupPubKey: groupPubKey,
