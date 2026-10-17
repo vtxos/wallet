@@ -68,7 +68,8 @@ platform_hint="none — no MerlinPlatform running, so the app has no bank sends"
 
 # Escrow services the cosigner may pair with, as `<service id hex>:<origin>_…`. A wallet names a
 # service by id and never by URL, so the set of reachable services is decided here, at deployment,
-# and is measured into PCR16 with the cosigner — see `ServiceRegistry` in cosigner/src/escrow.rs.
+# and is measured into PCR16 with the cosigner — see `ServiceRegistry` in src/escrow.rs of
+# vtxos/cosigner.
 # `dev-enclave.sh` validates a --guest-env value against [A-Za-z0-9:/._-], which admits neither `=`
 # nor `,` — so entries are separated by `_` and an id from its origin by `:`.
 if [[ -n "${ENCLAVE_SERVICE_ORIGINS:-}" ]]; then
