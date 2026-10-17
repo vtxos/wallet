@@ -51,6 +51,10 @@ scripts/platform.sh pins "$run"
 (while true; do scripts/bitcoin.sh mine >/dev/null 2>&1 || true; sleep 10; done) &
 miner=$!
 
+# On regtest the app watches for deposits at electrs on 127.0.0.1:50001 — the phone's own, which
+# reaches the host's only through adb.
+adb -s "$serial" reverse tcp:50001 tcp:50001
+
 # The emulator's passkey provider is the test one, built with the app's Gradle. Flutter generates
 # the wrapper and android/local.properties; neither is checked in.
 (cd app && flutter build apk --config-only >/dev/null)
@@ -76,10 +80,39 @@ health=$!
 # This boot's pins, and the component it serves, which the device cannot read for itself.
 defines="$(scripts/dev-enclave-defines.sh "$run")"
 defines+=" --dart-define=E2E_GUEST_SHA256=$(sha256sum "$run/guests/guest.wasm" | cut -d' ' -f1)"
-cd app
+
+# One file at a time, watched. `flutter test` finds the app by reading the device's log for where its
+# Dart VM listens, from a single logcat it never restarts. On the CI emulator that stream has ended
+# just as the app launched — the machine idle, adb still up — and then it waits for ever. A file
+# that prints nothing for ten minutes has hit that, and is run once more; one that fails, fails.
+run_file() {
+    local file=$1 out pid status hung attempt
+    out="$ENCLAVE_DIR/$(basename "$file" .dart).log"
+    for attempt in 1 2; do
+        : >"$out"
+        # shellcheck disable=SC2086 # the defines are separate flags
+        setsid bash -c 'cd "$0/app" && exec flutter test "$1" -d "$2" '"$defines" \
+            "$repo" "$file" "$serial" >"$out" 2>&1 &
+        pid=$! hung=""
+        tail -n +1 -f --pid="$pid" "$out" &
+        while kill -0 "$pid" 2>/dev/null; do
+            if (( $(date +%s) - $(stat -c %Y "$out") > 600 )); then
+                hung=1
+                kill -- "-$pid" 2>/dev/null || true
+                break
+            fi
+            sleep 15
+        done
+        status=0
+        wait "$pid" || status=$?
+        [[ -z $hung ]] && return "$status"
+        echo "$file printed nothing for ten minutes: the app was never reached (attempt $attempt)" >&2
+    done
+    return 1
+}
+
 # The app's flow first: the exit test moves bitcoind's clock on, which nothing after it minds.
-# Bounded: `flutter test` waits for the app to report in, with no limit of its own, so an app that
-# never starts would otherwise hold the run until something else gives up.
-# shellcheck disable=SC2086 # the defines are separate flags
-timeout "${E2E_TEST_TIMEOUT:-60m}" \
-    flutter test integration_test/app_test.dart integration_test/enclave_test.dart -d "$serial" $defines
+failed=0
+run_file integration_test/app_test.dart || failed=1
+run_file integration_test/enclave_test.dart || failed=1
+exit "$failed"
