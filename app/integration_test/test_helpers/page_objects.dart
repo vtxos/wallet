@@ -92,6 +92,42 @@ class ExitPage {
   }
 }
 
+class WalletPage {
+  static Future<void> open(WidgetTester tester) async {
+    await tester.tap(find.descendant(
+      of: find.byType(BottomNavigationBar),
+      matching: find.text('Wallet'),
+    ));
+    await tester.pumpAndSettle();
+  }
+}
+
+/// A payout through the platform, from the wallet's Send.
+class PayoutPage {
+  /// To Kenya's M-PESA, the corridor with no pickers: one rail and one provider, so a phone, a
+  /// name and an amount. Ends on the quote's Confirm, which asks for the passkey.
+  static Future<void> sendToMpesa(
+    WidgetTester tester, {
+    required String phone,
+    required String name,
+    required String amount,
+  }) async {
+    await _tapKey(tester, 'arkSendMoneyBtn');
+    // The platform's corridors load after the screen does.
+    await pumpUntilFound(tester, find.byKey(const Key('sendCountryKE')));
+    await _tapKey(tester, 'sendCountryKE');
+    final phoneField = find.widgetWithText(TextFormField, 'M-PESA number');
+    await pumpUntilFound(tester, phoneField);
+    await tester.enterText(phoneField, phone);
+    await _enterText(tester, 'payoutNameField', name);
+    await _enterText(tester, 'payoutAmountField', amount);
+    await _dismissKeyboard(tester);
+    await _tapKey(tester, 'payoutContinueBtn');
+    await pumpUntilFound(tester, find.byKey(const Key('payoutConfirmBtn')));
+    await _tapKey(tester, 'payoutConfirmBtn');
+  }
+}
+
 class ArkPage {
   /// Receiving IS boarding: on-chain to the boarding address, then settle.
   static Future<void> tapReceive(WidgetTester tester) =>

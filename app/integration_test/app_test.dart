@@ -1,10 +1,12 @@
 // One end-to-end testWidgets covering the user lifecycle:
 //   server → passkey → DKG → exit address → Ark board → the cosigner renews on its own → an entry
-//   to the app re-arms the renewal.
+//   to the app re-arms the renewal → a payout through the platform.
 
 // ignore_for_file: avoid_print
 
+import 'package:app/main.dart' show VtxosApp;
 import 'package:app/services/mpc_service.dart';
+import 'package:app/services/payout_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
@@ -137,9 +139,36 @@ void main() {
         expect(find.text('Your exit address'), findsOneWidget);
         expect(find.byKey(const Key('exitCopyBtn')), findsWidgets,
             reason: 'each signed exit can be copied out of the app');
+
+        // ── A payout through the platform ───────────────────────────
+        //
+        // KSh 1,500 to an M-PESA number. The platform quotes it, and the one approval Confirm asks
+        // for mints the payout's own escrow, pairs the platform into it, seals the deal and funds
+        // it. The platform pays through the fake Grid, then is repaid out of the escrow.
+        final payouts = Provider.of<PayoutService>(
+            tester.element(find.byType(VtxosApp)),
+            listen: false);
+        final balanceBefore = svcBoard.arkBalance;
+        await WalletPage.open(tester);
+        await PayoutPage.sendToMpesa(tester,
+            phone: '712345678', name: 'Ada Obi', amount: '1500');
+        await pumpUntilTrue(
+          tester,
+          () => payouts.payouts.isNotEmpty && payouts.payouts.first.finished,
+          timeout: const Duration(minutes: 4),
+        );
+        final sent = payouts.payouts.first;
+        expect(sent.state, 'repaid', reason: 'the payout failed: ${sent.failure}');
+        expect(sent.escrowKey, isNotNull, reason: 'it was sent from an escrow of its own');
+        expect(sent.arkTxid, isNotNull, reason: 'and the platform was repaid out of it');
+        await pumpUntilFound(tester, find.byKey(const Key('payoutSendAgainBtn')));
+        await svcBoard.refreshVtxos();
+        expect(svcBoard.arkBalance <= balanceBefore - BigInt.from(sent.sats), isTrue,
+            reason: 'the agreed price, ${sent.sats} sats, left the wallet');
       }
     },
-    // Boarding, then the cosigner's own renewal about five minutes after it, then an entry.
+    // Boarding, then the cosigner's own renewal about five minutes after it, then an entry, then a
+    // payout.
     timeout: const Timeout(Duration(minutes: 20)),
   );
 }
