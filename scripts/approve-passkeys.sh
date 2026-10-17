@@ -11,16 +11,7 @@
 # by its button rather than by window focus, which a mirror such as scrcpy can leave unset.
 set -euo pipefail
 adb=(adb ${1:+-s "$1"})
-tick=0
 while :; do
-    # A dump starts a JVM on the device and floods its log, so it is only made when the sheet's
-    # activity is the one in front — and every tenth time regardless, in case its name changes.
-    tick=$((tick + 1))
-    if (( tick % 10 )) && ! "${adb[@]}" shell dumpsys activity activities 2>/dev/null \
-        | grep -m1 -E 'topResumedActivity|mResumedActivity' | grep -qE 'CredentialChooser|credentialmanager'; then
-        sleep 1
-        continue
-    fi
     ui="$("${adb[@]}" exec-out uiautomator dump /dev/tty 2>/dev/null || true)"
     button="$(grep -oE '<node [^>]*text="Continue"[^>]*>' <<<"$ui" \
         | grep -E 'package="(com\.google\.android\.gms|com\.android\.credentialmanager)"' | head -1 || true)"
