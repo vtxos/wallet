@@ -34,8 +34,9 @@
   release `ffi/Cargo.toml` names. The image is generic: the cosigner's settings the suite
   needs live in `e2e/lib/e2e_profile.dart` and are given at start (`GUEST_ENV`, measured into PCR16
   with the component). `COSIGNER_WASM` serves a cosigner build of your own in it instead.
-- CI is `.github/workflows/ci.yml`; its `enclave-e2e` job runs the suite on the pinned image on a
-  hosted runner. Run it locally too before merging a change to a ceremony.
+- CI is `.github/workflows/ci.yml`; its `e2e` job runs `make e2e-all` on a hosted runner: the suite,
+  then the app's full flow on an Android emulator, on one boot of the pinned image's app bundle,
+  with MerlinPlatform. Run it locally too before merging a change to a ceremony.
 
 ## Coding Style & Naming Conventions
 - Dart: `UpperCamelCase` types, `lowerCamelCase` members, `snake_case` files. Rust: rustfmt defaults

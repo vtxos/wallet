@@ -15,7 +15,7 @@
 #    make release-testers-remove TESTERS="a@x.com"
 # ═══════════════════════════════════════════════════════════════════════════════
 
-.PHONY: e2e e2e-enclave e2e-app up up-enclave down down-enclave \
+.PHONY: e2e e2e-enclave e2e-all up up-enclave down down-enclave \
 	bob-up bob-down bob-send \
 	ffi-build ffi-test ffi-android ffi-android-arm32 ffi-android-x86_64 ffi-android-all \
 	enclave-image cosigner \
@@ -123,11 +123,11 @@ e2e-enclave: $(if $(ENCLAVE_RUN),,enclave-image) $(FFI_DEP) arkd-up bitcoin-init
 		ENCLAVE_RUNTIME=$(ENCLAVE_RUNTIME) VTXOS_ENCLAVE_RUN=$(ENCLAVE_RUN) ZFS_SIZE=$(E2E_ZFS_SIZE) \
 		dart test test/enclave_ark_test.dart --timeout $(E2E_TIMEOUT) --reporter expanded
 
-# The app's full flow on an Android emulator: a passkey through Credential Manager, DKG, boarding,
-# the cosigner's own renewal, an entry, and a payout through the platform. Start an emulator first
-# (API 34 or later). See scripts/e2e-app.sh.
-e2e-app: enclave-image arkd-up bitcoin-init arkd-init ffi-android-x86_64
-	./scripts/e2e-app.sh
+# Every e2e on one dev enclave: the suite above, attached, then the app's full flow on an Android
+# emulator, with its passkey through Credential Manager and a payout through the platform. Start an
+# emulator first (API 34 or later). See scripts/e2e-all.sh.
+e2e-all: enclave-image $(FFI_DEP) arkd-up bitcoin-init arkd-init ffi-android-x86_64
+	./scripts/e2e-all.sh
 
 # The cosigner release ffi/ builds against: the tag its Cargo.toml names for vtxos/cosigner.
 COSIGNER_RELEASE = $(shell sed -n 's|.*"https://github.com/vtxos/cosigner", tag = "\([^"]*\)".*|\1|p' ffi/Cargo.toml | sort -u)
