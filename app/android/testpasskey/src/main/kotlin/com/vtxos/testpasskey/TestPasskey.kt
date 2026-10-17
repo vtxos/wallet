@@ -94,8 +94,11 @@ class TestPasskeyService : CredentialProviderService() {
                 val allowed = options.optJSONArray("allowCredentials")
                     ?.let { a -> (0 until a.length()).map { a.getJSONObject(it).getString("id") } }
                     ?.toSet()
-                store.ids(options.getString("rpId"))
-                    .filter { allowed.isNullOrEmpty() || it in allowed }
+                // Asked for any passkey (a wallet restoring itself): only the newest, the one a test
+                // just made. A phone's provider lists them all and its owner picks; this one has no
+                // owner, and a list would leave nothing for approve-passkeys.sh to tap but a guess.
+                val ids = store.ids(options.getString("rpId"))
+                (if (allowed.isNullOrEmpty()) ids.take(1) else ids.filter { it in allowed })
                     .map { id ->
                         PublicKeyCredentialEntry.Builder(this, id.take(12), pendingIntent(this, "get", id), option)
                             .build()
@@ -170,8 +173,13 @@ private class Store(context: Context) {
     private val prefs = context.getSharedPreferences("passkeys", Context.MODE_PRIVATE)
     private val random = SecureRandom()
 
+    /** This relying party's credentials, newest first. */
     fun ids(rpId: String): List<String> =
-        prefs.all.keys.filter { JSONObject(prefs.getString(it, "{}")!!).optString("rpId") == rpId }
+        prefs.all.keys
+            .map { it to JSONObject(prefs.getString(it, "{}")!!) }
+            .filter { (_, c) -> c.optString("rpId") == rpId }
+            .sortedByDescending { (_, c) -> c.optLong("created") }
+            .map { (id, _) -> id }
 
     /** A registration: a fresh P-256 key, attested `none`. */
     fun create(requestJson: String, app: CallingAppInfo): String {
@@ -185,6 +193,7 @@ private class Store(context: Context) {
             b64(id),
             JSONObject()
                 .put("rpId", rpId)
+                .put("created", System.currentTimeMillis())
                 .put("key", b64(keys.private.encoded))
                 .put("credRandom", b64(credRandom))
                 .put("userHandle", options.getJSONObject("user").getString("id"))

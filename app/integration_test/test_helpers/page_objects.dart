@@ -41,6 +41,16 @@ Future<void> _dismissKeyboard(WidgetTester tester) async {
 class WelcomePage {
   static Future<void> tapCreate(WidgetTester tester) =>
       _tapKey(tester, 'welcomeCreateBtn');
+  static Future<void> tapRestore(WidgetTester tester) =>
+      _tapKey(tester, 'welcomeRestoreBtn');
+}
+
+/// "I already have a wallet": the passkey is looked for, and the wallet recovered with it.
+class RestorePage {
+  static Future<void> restore(WidgetTester tester) async {
+    await pumpUntilFound(tester, find.byKey(const Key('restoreWalletBtn')));
+    await _tapKey(tester, 'restoreWalletBtn');
+  }
 }
 
 class PasskeySetupPage {
