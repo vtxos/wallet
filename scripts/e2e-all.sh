@@ -1,21 +1,25 @@
 #!/usr/bin/env bash
-# Every e2e, on one dev enclave: the suite (e2e/test/enclave_ark_test.dart, software passkeys) and
-# the app's full flow on an Android emulator (app/integration_test/app_test.dart): a passkey, DKG,
-# boarding, the cosigner's own renewal, an entry, the Exit tab and a payout through the platform.
+# Every e2e, from an Android emulator against one dev enclave and MerlinPlatform:
 #
-# The enclave is the dev enclave image's app bundle (ENCLAVE_BUNDLE=app). Its relying party is
-# vtxos.com, and it allows https://vtxos.com, which the suite's software passkeys claim, as well as
-# the app's android:apk-key-hash origins. The cosigner has the suite's settings (e2eSettings), which
-# name both the suite's escrow service and MerlinPlatform.
+#   app/integration_test/app_test.dart     the app's full flow through its screens: a passkey, DKG,
+#                                          boarding, the cosigner's own renewal, an entry, the Exit
+#                                          tab and a payout through the platform
+#   app/integration_test/enclave_test.dart the wallet against the cosigner: attestation and its
+#                                          refusals, tenants, sends, exits that really spend,
+#                                          recovery, and what must be refused
 #
-# The app's passkey takes the real path, PasskeyPlugin → Credential Manager → a provider: the
-# provider is app/android/testpasskey, set as the emulator's over adb, and
-# scripts/approve-passkeys.sh taps each sheet's Continue as the owner would.
+# The enclave is the dev enclave image's app bundle (ENCLAVE_BUNDLE=app), whose relying party is
+# vtxos.com and which allows the app's android:apk-key-hash origins, with the cosigner set as the e2e
+# sets it (e2eSettings: the ASP, a delegate due within minutes, MerlinPlatform and the fake Grid).
+#
+# Every passkey takes the real path, PasskeyPlugin → Credential Manager → a provider: the provider
+# is app/android/testpasskey, set as the emulator's over adb, and scripts/approve-passkeys.sh taps
+# each sheet's Continue as the owner would.
 #
 #   make e2e-all       with an emulator up, API 34 or later; ANDROID_SERIAL picks one of several
 #
-# `make e2e-all` brings up regtest and arkd and builds both FFIs first. MerlinPlatform is found as
-# scripts/platform.sh finds it. Both suites run whatever the first does; it fails if either did.
+# `make e2e-all` brings up regtest and arkd and builds the emulator's FFI first. MerlinPlatform is
+# found as scripts/platform.sh finds it. COSIGNER_WASM serves a cosigner build of your own.
 set -euo pipefail
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$repo"
@@ -30,7 +34,13 @@ export ENCLAVE_DIR="$repo/.enclave-run" ENCLAVE_BUNDLE=app ZFS_SIZE="${E2E_ZFS_S
 GUEST_ENV="$(cd e2e && dart pub get >/dev/null && dart run bin/guest_env.dart)"
 export GUEST_ENV
 mkdir -p "$ENCLAVE_DIR"
-compose=(docker compose -f docker-compose.enclave.yml)
+# A cosigner build of your own instead of the image's: the container sees only ENCLAVE_DIR.
+if [[ -n "${COSIGNER_WASM:-}" ]]; then
+    cp "$COSIGNER_WASM" "$ENCLAVE_DIR/guest.wasm"
+    export GUEST="$ENCLAVE_DIR/guest.wasm"
+fi
+# By its full path: the trap that takes it down runs from wherever the script has got to.
+compose=(docker compose -f "$repo/docker-compose.enclave.yml")
 miner="" approver=""
 trap 'kill $miner $approver 2>/dev/null || true; "${compose[@]}" down >/dev/null 2>&1 || true' EXIT
 "${compose[@]}" up -d --wait --wait-timeout 1500 || { "${compose[@]}" logs --tail 80; exit 1; }
@@ -40,9 +50,6 @@ scripts/platform.sh pins "$run"
 # Nothing moves on regtest unless somebody mines.
 (while true; do scripts/bitcoin.sh mine >/dev/null 2>&1 || true; sleep 10; done) &
 miner=$!
-
-suite=0
-make --no-print-directory e2e-enclave ENCLAVE_RUN="$run" FFI_DEP= || suite=$?
 
 # The emulator's passkey provider is the test one, built with the app's Gradle. Flutter generates
 # the wrapper and android/local.properties; neither is checked in.
@@ -55,11 +62,10 @@ adb -s "$serial" shell settings put secure credential_service_primary "$provider
 scripts/approve-passkeys.sh "$serial" &
 approver=$!
 
-app=0
+# This boot's pins, and the component it serves, which the device cannot read for itself.
 defines="$(scripts/dev-enclave-defines.sh "$run")"
+defines+=" --dart-define=E2E_GUEST_SHA256=$(sha256sum "$run/guests/guest.wasm" | cut -d' ' -f1)"
+cd app
+# The app's flow first: the exit test moves bitcoind's clock on, which nothing after it minds.
 # shellcheck disable=SC2086 # the defines are separate flags
-(cd app && flutter test integration_test/app_test.dart -d "$serial" $defines) || app=$?
-
-echo "the suite: $([[ $suite == 0 ]] && echo passed || echo "failed ($suite)")," \
-     "the app: $([[ $app == 0 ]] && echo passed || echo "failed ($app)")"
-[[ $suite == 0 && $app == 0 ]]
+flutter test integration_test/app_test.dart integration_test/enclave_test.dart -d "$serial" $defines

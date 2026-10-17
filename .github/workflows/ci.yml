@@ -3,14 +3,13 @@
 # the release ffi/Cargo.toml names, and tested there; `make proto` takes its protos from the same
 # checkout.
 #
-# The fourth is every e2e, on one dev enclave (scripts/e2e-all.sh): the image infra builds
-# (docker-compose.enclave.yml: the runtime's QEMU enclave and that cosigner release), booted on a
-# hosted runner's KVM as the runtime's own CI boots one, with MerlinPlatform beside it. First the
-# suite, which proves the ceremonies and every refusal with software passkeys; then the app's full
-# flow on an Android emulator on the same KVM, with its passkey through Credential Manager to a
-# test provider, ending in a payout through the platform. Nested virtualisation works there but is
-# not something GitHub supports, so this is the job that can fail for reasons outside this
-# repository; its logs are uploaded when it does.
+# The fourth is every e2e (scripts/e2e-all.sh), from an Android emulator against one dev enclave:
+# the image infra builds (docker-compose.enclave.yml: the runtime's QEMU enclave and that cosigner
+# release), booted on a hosted runner's KVM as the runtime's own CI boots one, with MerlinPlatform
+# beside it. The app's full flow through its screens, then the wallet against the cosigner — the
+# ceremonies, and every refusal — with every passkey through Credential Manager to a test provider.
+# Nested virtualisation works there but is not something GitHub supports, so this is the job that
+# can fail for reasons outside this repository; its logs are uploaded when it does.
 name: CI
 
 on:
@@ -111,7 +110,7 @@ jobs:
           flutter test
 
   e2e:
-    name: E2E (the suite, then the app on an emulator; enclave and platform)
+    name: E2E (the app and the wallet, on an emulator; enclave and platform)
     needs: rust
     runs-on: ubuntu-latest
     timeout-minutes: 120
@@ -172,7 +171,7 @@ jobs:
           fi
           [ -e /dev/vsock ] || sudo modprobe vsock_loopback
       # The image Play services draws Credential Manager's sheet on, as on a phone.
-      - name: Both, on an emulator
+      - name: On an emulator
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 35

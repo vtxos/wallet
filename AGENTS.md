@@ -26,17 +26,20 @@
 - `cd core && dart test`; `cd app && flutter analyze --no-fatal-infos && flutter test`;
   `dart analyze` in `protocol/`, `cli/`, `e2e/`. Flutter may be off PATH (`~/dev/flutter/bin`).
 - `make up-enclave` boots a dev enclave (docker regtest + arkd + QEMU from the `~/enclave-runtime`
-  checkout, serving `make cosigner`'s wasm or `COSIGNER_WASM`); `make e2e-enclave` runs the suite
-  against one (or attaches with `ENCLAVE_RUN=`); `make cli`.
-- The e2e starts the dev enclave image pinned by digest in `docker-compose.enclave.yml` — the
-  runtime's QEMU enclave and the released cosigner in one container, built by infra
-  (`dev-enclave/` there). `make enclave-image` pulls it and refuses it unless its cosigner is the
-  release `ffi/Cargo.toml` names. The image is generic: the cosigner's settings the suite
-  needs live in `e2e/lib/e2e_profile.dart` and are given at start (`GUEST_ENV`, measured into PCR16
-  with the component). `COSIGNER_WASM` serves a cosigner build of your own in it instead.
-- CI is `.github/workflows/ci.yml`; its `e2e` job runs `make e2e-all` on a hosted runner: the suite,
-  then the app's full flow on an Android emulator, on one boot of the pinned image's app bundle,
-  with MerlinPlatform. Run it locally too before merging a change to a ceremony.
+  checkout, serving `make cosigner`'s wasm or `COSIGNER_WASM`); `make cli`.
+- The e2e is `make e2e` (`scripts/e2e-all.sh`), from an Android emulator (API 34+, started first):
+  `app/integration_test/app_test.dart`, the app's full flow through its screens, and
+  `enclave_test.dart`, the wallet against the cosigner. Every passkey goes through Credential
+  Manager to `app/android/testpasskey`, a software provider, and `scripts/approve-passkeys.sh`
+  taps each sheet. It starts the dev enclave image pinned by digest in
+  `docker-compose.enclave.yml` — the runtime's QEMU enclave and the released cosigner in one
+  container, built by infra (`dev-enclave/` there) — booting its app bundle (rp id `vtxos.com`),
+  with MerlinPlatform. `make enclave-image` pulls it and refuses it unless its cosigner is the
+  release `ffi/Cargo.toml` names. The cosigner's settings live in `e2e/lib/e2e_profile.dart` and
+  are given at start (`GUEST_ENV`, measured into PCR16 with the component). `COSIGNER_WASM` serves a
+  cosigner build of your own in it instead.
+- CI is `.github/workflows/ci.yml`; its `e2e` job runs `make e2e-all` on a hosted runner's KVM. Run
+  it locally too before merging a change to a ceremony.
 
 ## Coding Style & Naming Conventions
 - Dart: `UpperCamelCase` types, `lowerCamelCase` members, `snake_case` files. Rust: rustfmt defaults
@@ -51,7 +54,8 @@
   unit tests; `core/test/operation_lifecycle_test.dart` drives `MpcClient` against an
   in-process cosigner; the cosigner's own tests are in vtxos/cosigner.
 - A fix to a security-relevant path comes with a test that fails without it (mutation-check it).
-- `make e2e-enclave` needs docker, KVM and vsock (`modprobe vsock_loopback`); ~7 minutes warm.
+- `make e2e` needs docker, KVM and vsock (`modprobe vsock_loopback`), and an emulator up;
+  ~20 minutes warm.
 
 ## Security Invariants (see README "No key at rest", SECURITY_FINDINGS RC-3/RC-4)
 - The device persists no private-key material. `WalletStore.saveClientState` refuses

@@ -122,7 +122,7 @@ This flow shows what the runtime contributes to a working wallet:
 
 **The authorization was signed before the phone went offline.** This is not authority for arbitrary new payments or an unlimited renewal loop. An unattended renewal also creates an output whose pre-signed exit must be obtained when the owner returns.
 
-The [`the delegate` end-to-end test](e2e/test/enclave_ark_test.dart) exercises renewal without a new signing call from the client, checks the changed outpoint and later expiry, then verifies that the new funds need protection again. It polls the indexer to observe progress. Separate tests exercise changed-guest/certificate refusals, distinct tenants, share reconstruction, and escrow-service delivery.
+The [app's end-to-end flow](app/integration_test/app_test.dart) watches the cosigner renew the funds with no signing call from the app, sees the new funds need protection again, then re-arms them on the next entry. It polls the indexer to observe progress. [`enclave_test.dart`](app/integration_test/enclave_test.dart) exercises changed-guest/certificate refusals, distinct tenants, share reconstruction, and recovery.
 
 For a presentation, show the approval, original and refreshed outpoints, the absence of a new phone signing operation, and the notification. Add a preserved-store restart as a separate persistence demonstration. Record the revision, test environment, and observed outcome; distinguish QEMU protocol checks from hardware-backed Nitro evidence.
 
@@ -258,21 +258,14 @@ The smoke command checks attestation, separate wallets, and DKG; its funded path
 | `make ffi-test` | Tests for the merged native FFI library. |
 | `make ffi-build` then `(cd core && dart pub get && dart test)` | Shared client tests, including share reconstruction, operation lifetimes, attestation, and persistence. |
 | `(cd app && flutter test)` | Flutter tests after package setup. |
-| `make e2e` | Builds the FFI, starts regtest/arkd, starts the dev enclave image and runs `e2e/test/enclave_ark_test.dart`. |
-| `make e2e-all` | With an Android emulator up (API 34+): everything CI's e2e job runs. On one boot of the image's app bundle, with MerlinPlatform, the suite above, then the app's full flow (`app/integration_test/app_test.dart`): a passkey through Credential Manager to a test provider (`app/android/testpasskey`), DKG, boarding, the cosigner's own renewal, an entry, the Exit tab and a payout. See `scripts/e2e-all.sh`. |
+| `make e2e` | With an Android emulator up (API 34+): every e2e, as CI's e2e job runs it. Starts regtest/arkd, MerlinPlatform and the dev enclave image's app bundle, then runs, on the emulator, `app/integration_test/app_test.dart` (the app's full flow through its screens) and `enclave_test.dart` (the wallet against the cosigner). Every passkey goes through Credential Manager to a test provider (`app/android/testpasskey`). See `scripts/e2e-all.sh`. |
 | `make proto-check` | Verifies checked-in Dart stubs match the protobuf sources; requires `protoc` and the Dart plugin. |
 
-The end-to-end suite covers measured-guest and certificate refusals, DKG, distinct tenants, boarding/settlement/sends, delegated renewal, contribution isolation, reconstructed shares, exits, and service pairing. These tests exist in the source; this README does not imply a fresh successful run of every suite.
+The end-to-end tests run from the emulator, as the app does. `app_test.dart` is the app's full flow through its screens: onboarding with a passkey, DKG, boarding, the cosigner's own renewal, an entry with the passkey, the Exit tab, a payout through the platform, a restart, and a restore on a "new phone" that pays again. `enclave_test.dart` is the wallet against the cosigner: measured-guest and certificate refusals, DKG, distinct tenants, sends, exits that bitcoind accepts, recovery, a wrong seed or PRF refused, contribution isolation, and an unknown service refused. These tests exist in the source; this README does not imply a fresh successful run of every suite.
 
-For a complete E2E run, let the harness configure its own enclave. An existing one can be selected with:
+Every passkey takes the real Android path, Credential Manager to a provider. The provider is `app/android/testpasskey`, a software one set as the emulator's over adb, and `scripts/approve-passkeys.sh` taps each sheet's Continue. The enclave is the image's app bundle, built with the app's relying party and origins. The image carries nothing of the tests': the cosigner's settings in `e2e/lib/e2e_profile.dart` are given when it starts (`GUEST_ENV`), written into the component and measured into PCR16 with it. Only one emulator stack can own the fixed MinIO port/vsock configuration at a time.
 
-```bash
-make e2e-enclave ENCLAVE_RUN="$ENCLAVE_CHECKOUT/target/qemu-nitro/vtxos"
-```
-
-An attached enclave's cosigner must also name the suite's escrow-service fixture and use a renewal margin suitable for the test timeout. The delegate test reports a skip if the deadline is too far away. The image carries nothing of this suite's: the harness gives the cosigner the settings in `e2e/lib/e2e_profile.dart` when it starts it (`GUEST_ENV`), written into the component and measured into PCR16 with it. Only one emulator stack can own the fixed MinIO port/vsock configuration at a time.
-
-CI (`.github/workflows/ci.yml`) runs the FFI's `cargo test`, every Dart package's analysis, `core`'s tests against the built FFI, the app's `flutter analyze` and `flutter test`, and every e2e: the `e2e` job runs `make e2e-all` on the runner's KVM (hosted runners have nested virtualisation; the runtime's own CI relies on the same), the suite and then the app on an emulator. Moving to a newer runtime or cosigner is infra's: it builds the image from its pins and prints the digest, which goes into `docker-compose.enclave.yml`, with the tags in `ffi/Cargo.toml` moved to the same cosigner release. A change to a ceremony is still run locally before it is called done. Host tests, QEMU integration tests, Android device tests, and real Nitro validation establish different properties.
+CI (`.github/workflows/ci.yml`) runs the FFI's `cargo test`, every Dart package's analysis, `core`'s tests against the built FFI, the app's `flutter analyze` and `flutter test`, and every e2e: the `e2e` job runs `make e2e-all` with an emulator on the runner's KVM (hosted runners have nested virtualisation; the runtime's own CI relies on the same). Moving to a newer runtime or cosigner is infra's: it builds the image from its pins and prints the digest, which goes into `docker-compose.enclave.yml`, with the tags in `ffi/Cargo.toml` moved to the same cosigner release. A change to a ceremony is still run locally before it is called done. Host tests, QEMU integration tests, Android device tests, and real Nitro validation establish different properties.
 
 ## Repository guide
 
@@ -402,8 +395,9 @@ so an abandoned reclaim is as final as a finished one; the next deal gets a new 
 Tests: `core/test/share_reconstruction_test.dart`, `escrow_reconstruction_test.dart`,
 `operation_lifecycle_test.dart` (a cosigner in-process; reads the box file back as raw bytes),
 `cancel_streams_test.dart`, the cosigner's [`stream_contribution_test.rs`](https://github.com/vtxos/cosigner/blob/main/cosigner/tests/stream_contribution_test.rs) and [`seal_test.rs`](https://github.com/vtxos/cosigner/blob/main/cosigner/tests/seal_test.rs), and
-the `nothing secret at rest`, `a wallet on a new phone` and `pairing a service into an escrow`
-groups of `e2e/test/enclave_ark_test.dart`.
+the `nothing secret at rest` and `a wallet on a new phone` groups of
+`app/integration_test/enclave_test.dart`, and the payout in `app_test.dart`, whose escrow is set up
+and its share rebuilt on one approval.
 
 ## Trust assumptions & failure modes
 
