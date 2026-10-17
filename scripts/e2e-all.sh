@@ -41,8 +41,8 @@ if [[ -n "${COSIGNER_WASM:-}" ]]; then
 fi
 # By its full path: the trap that takes it down runs from wherever the script has got to.
 compose=(docker compose -f "$repo/docker-compose.enclave.yml")
-miner="" approver=""
-trap 'kill $miner $approver 2>/dev/null || true; "${compose[@]}" down >/dev/null 2>&1 || true' EXIT
+miner="" approver="" logcat=""
+trap 'kill $miner $approver $logcat 2>/dev/null || true; "${compose[@]}" down >/dev/null 2>&1 || true' EXIT
 "${compose[@]}" up -d --wait --wait-timeout 1500 || { "${compose[@]}" logs --tail 80; exit 1; }
 run="$ENCLAVE_DIR/bundle/target/qemu-nitro/vtxos"
 scripts/platform.sh pins "$run"
@@ -61,11 +61,18 @@ adb -s "$serial" shell settings put secure credential_service "$provider"
 adb -s "$serial" shell settings put secure credential_service_primary "$provider"
 scripts/approve-passkeys.sh "$serial" &
 approver=$!
+# The emulator's own log, for when the app never gets as far as printing anything.
+adb -s "$serial" logcat -c
+adb -s "$serial" logcat >"$ENCLAVE_DIR/logcat.txt" 2>&1 &
+logcat=$!
 
 # This boot's pins, and the component it serves, which the device cannot read for itself.
 defines="$(scripts/dev-enclave-defines.sh "$run")"
 defines+=" --dart-define=E2E_GUEST_SHA256=$(sha256sum "$run/guests/guest.wasm" | cut -d' ' -f1)"
 cd app
 # The app's flow first: the exit test moves bitcoind's clock on, which nothing after it minds.
+# Bounded: `flutter test` waits for the app to report in, with no limit of its own, so an app that
+# never starts would otherwise hold the run until something else gives up.
 # shellcheck disable=SC2086 # the defines are separate flags
-flutter test integration_test/app_test.dart integration_test/enclave_test.dart -d "$serial" $defines
+timeout "${E2E_TEST_TIMEOUT:-60m}" \
+    flutter test integration_test/app_test.dart integration_test/enclave_test.dart -d "$serial" $defines

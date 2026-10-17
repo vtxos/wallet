@@ -192,4 +192,5 @@ jobs:
           name: e2e-logs
           path: |
             .enclave-run/bundle/target/qemu-nitro/vtxos/*.log
+            .enclave-run/logcat.txt
             .platform/run/*.log
