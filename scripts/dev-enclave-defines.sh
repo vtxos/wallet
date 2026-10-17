@@ -8,7 +8,7 @@
 # app/lib/services/server_host.dart). Rebuild after restarting the enclave.
 set -euo pipefail
 
-run="${1:-${ENCLAVE_RUNTIME:-$HOME/enclave-runtime}/target/qemu-nitro/merlin}"
+run="${1:-${ENCLAVE_RUNTIME:-$HOME/enclave-runtime}/target/qemu-nitro/vtxos}"
 for f in trust-root.der pebble-root.pem console.log; do
     [[ -f "$run/$f" ]] || { echo "no $f in $run — is a dev enclave up?" >&2; exit 1; }
 done

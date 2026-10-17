@@ -178,11 +178,11 @@ class PushService {
     await plugin.initialize(settings: _notificationSettings);
     await plugin.show(
       id: _wakeNotification,
-      title: 'Merlin Wallet',
+      title: 'vtxos',
       // `settle-due`: the cosigner could not renew, so it is the owner's to do, and soon.
       body: category == categorySettleDue
-          ? 'Open Merlin Wallet soon to keep your funds protected.'
-          : 'Open Merlin Wallet to keep your funds protected.',
+          ? 'Open vtxos soon to keep your funds protected.'
+          : 'Open vtxos to keep your funds protected.',
       notificationDetails: const NotificationDetails(android: _reminders),
     );
   }

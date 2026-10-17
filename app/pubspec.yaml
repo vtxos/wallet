@@ -1,5 +1,5 @@
 name: app
-description: "Merlin Wallet: a passkey-secured Ark Bitcoin wallet."
+description: "vtxos: a passkey-secured Ark Bitcoin wallet."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
@@ -40,8 +40,8 @@ dependencies:
   provider: ^6.1.2
   intl: ^0.19.0
   qr_flutter: ^4.1.0
-  app_core:
-    path: ../app-core
+  core:
+    path: ../core
   protocol:
     path: ../protocol
   grpc: ^3.2.4

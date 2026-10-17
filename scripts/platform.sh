@@ -7,10 +7,10 @@
 #   scripts/platform.sh pins <run>    believe the dev enclave booted in <run> (its PCRs and root)
 #
 # MerlinPlatform is a repository of its own, found at $MERLIN_PLATFORM (default ../MerlinPlatform).
-# It depends on this repository's crates by git revision; here it is built against THIS checkout's
-# instead, so the platform always speaks the protocol of the cosigner being run. That takes a
-# `--config patch`, which rewrites Cargo.lock — so what is built is a copy in .platform/build, and
-# the MerlinPlatform checkout is never touched.
+# It depends on vtxos/cosigner's crates by release tag, as ffi/ does, and is built as it is: it is
+# refused unless that tag is the one ffi/ builds against, so the platform speaks the protocol of the
+# cosigner being run. What is built is a copy in .platform/build; the MerlinPlatform checkout is
+# never touched.
 #
 # With no MerlinPlatform checkout this says so and does nothing: the rest of the stack runs, and the
 # app has no bank sends.
@@ -38,13 +38,16 @@ running() { [[ -f "$run/$1.pid" ]] && kill -0 "$(cat "$run/$1.pid")" 2>/dev/null
 build() {
     mkdir -p "$build/src"
     rsync -a --delete --exclude target --exclude .git "$source_dir/" "$build/src/"
-    local patch=() crate
-    for crate in escrow-service=crates/escrow-service cosigner=cosigner ark=crates/ark \
-                 threshold=crates/threshold; do
-        patch+=(--config "patch.\"https://github.com/BitspendPayment/MerlinWallet\".${crate%%=*}.path=\"$repo/${crate#*=}\"")
-    done
+    local tag='s|.*"https://github.com/vtxos/cosigner", tag = "\([^"]*\)".*|\1|p'
+    local ours theirs
+    ours="$(sed -n "$tag" "$repo/ffi/Cargo.toml" | sort -u)"
+    theirs="$(sed -n "$tag" "$build/src/Cargo.toml" | sort -u)"
+    [[ "$ours" == "$theirs" ]] || {
+        echo "MerlinPlatform builds against cosigner ${theirs:-(none)}, this wallet against $ours" >&2
+        exit 1
+    }
     cargo build --release --bins --manifest-path "$build/src/Cargo.toml" \
-        --target-dir "$build/target" "${patch[@]}"
+        --target-dir "$build/target"
 }
 
 stop() {

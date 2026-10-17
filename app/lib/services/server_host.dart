@@ -12,10 +12,10 @@ library;
 
 import 'dart:convert';
 
-import 'package:app_core/enclave/attestation.dart';
-import 'package:app_core/enclave/endpoint.dart';
-import 'package:app_core/sessions/service_delivery.dart';
-import 'package:app_core/threshold_types.dart' as threshold;
+import 'package:core/enclave/attestation.dart';
+import 'package:core/enclave/endpoint.dart';
+import 'package:core/sessions/service_delivery.dart';
+import 'package:core/threshold_types.dart' as threshold;
 
 /// Dev/loopback addresses: a dev enclave (`dev-enclave.sh`) on the workstation.
 ///
@@ -118,7 +118,7 @@ String origin(String host, {DevEnclaveConfig dev = DevEnclaveConfig.fromDefines}
 /// Where [host]'s deployment publishes what its enclave must attest to, or null for a host that
 /// publishes to the release manifest instead.
 ///
-/// The MutinyNet host is a Nitro enclave deployed from vtxos/merlin-infra, which publishes
+/// The MutinyNet host is a Nitro enclave deployed from vtxos/infra, which publishes
 /// each release's measurements here. No trust root: its documents chain to AWS's.
 Uri? pinsUrl(String host) => switch (host) {
       'mutiny.vtxos.network' => Uri.parse(
@@ -161,7 +161,7 @@ Endpoint aspEndpoint(String host) {
 
 // --- Sending to banks and mobile money -----------------------------------------------------------
 
-/// The payout platform's name in the enclave's image — MerlinPlatform's `--label`.
+/// The payout platform's name in the enclave's image — the platform's `--label`.
 const String platformServiceLabel = 'merlin-platform';
 
 /// The platform's identifier, as a pairing names it. Derived through the FFI, on first use.
@@ -169,7 +169,7 @@ final threshold.Identifier platformIdentifier =
     threshold.Identifier.derive(utf8.encode(platformServiceLabel));
 
 /// Where [host]'s payout platform answers, or null where there is none — and then sending to banks
-/// is not offered. Local: MerlinPlatform beside the dev enclave and the ASP, reached the same way.
+/// is not offered. Local: the platform beside the dev enclave and the ASP, reached the same way.
 /// MutinyNet: beside its enclave, on :8443 — the origin the enclave names for it, so the app and
 /// the cosigner reach the same platform.
 Uri? platformBase(String host) => switch (host) {

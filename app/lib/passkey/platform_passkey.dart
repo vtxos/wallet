@@ -3,7 +3,7 @@
 /// One credential does two jobs, and for an operation that signs, in one gesture:
 ///
 ///  * **Approval.** enclave-runtime gates every request on an assertion bound to that request, so
-///    this implements app-core's [Authenticator] and [PasskeyRegistrar] over Credential Manager
+///    this implements core's [Authenticator] and [PasskeyRegistrar] over Credential Manager
 ///    ([PasskeyChannel]).
 ///  * **The seed.** The credential's PRF extension, evaluated at a fixed salt, gives 32 bytes the
 ///    wallet's half of its FROST share is derived from — again for every operation, because no
@@ -19,7 +19,7 @@
 /// It used to be evaluated on every assertion and kept for two minutes, so that the several FROST
 /// rounds of one send would not each prompt. That made a clock the only limit on the seed's life,
 /// and let any approval leave one behind. The rounds of an operation now share the *share* it
-/// rebuilt, inside the operation (`app_core/passkey/operation_secrets.dart`); nothing here outlives
+/// rebuilt, inside the operation (`core/passkey/operation_secrets.dart`); nothing here outlives
 /// the call that asked for it.
 ///
 /// What this cannot do is scrub the platform's own copies: the output crosses the platform channel
@@ -61,8 +61,8 @@ import 'dart:convert';
 import 'dart:math';
 import 'dart:typed_data';
 
-import 'package:app_core/enclave/authenticator.dart';
-import 'package:app_core/passkey/seed_source.dart';
+import 'package:core/enclave/authenticator.dart';
+import 'package:core/passkey/seed_source.dart';
 import 'package:crypto/crypto.dart' show sha256;
 import 'package:flutter/services.dart' show PlatformException;
 

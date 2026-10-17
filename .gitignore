@@ -24,25 +24,6 @@ result-*
 **/*.jks
 **/*.keystore
 
-# Python
-**/.venv/
-**/__pycache__/
-
-# HW Signer firmware build artifacts
-*.elf
-*.uf2
-*.bak
-hwsigner-secure/target/
-embassy-rp-fork/target/
-threshold/target
-threshold-ffi/target
-cosigner/target
-server/target
-e2e/signer-server/target
-ark/target
-ark-ffi/target
-hwsigner-secure/target
-
 # IDE
 .vscode/
 .idea/
@@ -64,15 +45,9 @@ protocol/lib/src/generated/
 # Data
 e2e/hive_db
 
-# The prebuilt dev enclave `make enclave-bundle` unpacks (hundreds of MB; pinned by enclave-bundle.lock).
-.enclave/
+# Where the dev enclave image runs its harness from, as e2e-enclave starts it (hundreds of MB).
+.enclave-run/
+# The image's cosigner.wasm, as `make cosigner` takes it out.
+.cosigner/
 # The payout platform the regtest stack runs: its build copy, state and logs. See scripts/platform.sh.
 .platform/
-
-# Vendored Rust crate sources (cosigner-runtime/vendor/) are committed so the
-# EIF / offline build needs zero crates.io access. Crates legitimately contain
-# files/dirs matched by the rules above (target/, build/, .vscode/, *.log, …);
-# excluding ANY of them corrupts the vendored checksums and breaks the build.
-# Keep this LAST so it overrides every rule above.
-!cosigner-runtime/vendor/
-!cosigner-runtime/vendor/**

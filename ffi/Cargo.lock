@@ -20,6 +20,7 @@ checksum = "330a5ed07fa54e4702c9d6c4174f74427fc0ef6e214bbd677ae50a5099946470"
 [[package]]
 name = "ark"
 version = "0.1.0"
+source = "git+https://github.com/vtxos/cosigner?tag=v0.1.1#9a26d2491356f1d5ffbde3c6695247580e112445"
 dependencies = [
  "ark-core",
  "bitcoin",
@@ -357,6 +358,7 @@ dependencies = [
 [[package]]
 name = "enclave-client"
 version = "0.1.0"
+source = "git+https://github.com/vtxos/cosigner?tag=v0.1.1#9a26d2491356f1d5ffbde3c6695247580e112445"
 dependencies = [
  "base64 0.22.1",
  "ciborium",
@@ -1140,6 +1142,7 @@ dependencies = [
 [[package]]
 name = "threshold"
 version = "0.1.0"
+source = "git+https://github.com/vtxos/cosigner?tag=v0.1.1#9a26d2491356f1d5ffbde3c6695247580e112445"
 dependencies = [
  "elliptic-curve",
  "hex-conservative",

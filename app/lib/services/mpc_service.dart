@@ -6,19 +6,19 @@ import 'package:flutter/services.dart' show PlatformException;
 import 'package:hive/hive.dart';
 import 'package:path_provider/path_provider.dart';
 
-import 'package:app_core/asp/asp_client.dart';
-import 'package:app_core/asp/exit_chain.dart';
-import 'package:app_core/asp/history.dart';
-import 'package:app_core/boarding.dart';
-import 'package:app_core/client.dart';
-import 'package:app_core/sessions/exit_plan.dart' show ExitTx;
-import 'package:app_core/cosigner/connection.dart' show CosignerException;
-import 'package:app_core/enclave/attestation.dart';
-import 'package:app_core/enclave/gate.dart';
-import 'package:app_core/enclave/manifest.dart' as manifest;
-import 'package:app_core/passkey/operation_secrets.dart' show OperationCancelled;
-import 'package:app_core/passkey/share_reconstruction.dart' show WrongPasskey;
-import 'package:app_core/persistence/wallet_store.dart'
+import 'package:core/asp/asp_client.dart';
+import 'package:core/asp/exit_chain.dart';
+import 'package:core/asp/history.dart';
+import 'package:core/boarding.dart';
+import 'package:core/client.dart';
+import 'package:core/sessions/exit_plan.dart' show ExitTx;
+import 'package:core/cosigner/connection.dart' show CosignerException;
+import 'package:core/enclave/attestation.dart';
+import 'package:core/enclave/gate.dart';
+import 'package:core/enclave/manifest.dart' as manifest;
+import 'package:core/passkey/operation_secrets.dart' show OperationCancelled;
+import 'package:core/passkey/share_reconstruction.dart' show WrongPasskey;
+import 'package:core/persistence/wallet_store.dart'
     show IncompatibleWalletStateException, WalletStore;
 
 import '../passkey/passkey_channel.dart';
@@ -58,7 +58,7 @@ class MpcService extends ChangeNotifier {
   bool get dkgComplete => _dkgComplete;
   bool get isConnected => _isConnected;
 
-  /// Deposits only: this wallet holds no on-chain coins and spends none. See `app_core/boarding`.
+  /// Deposits only: this wallet holds no on-chain coins and spends none. See `core/boarding`.
   BoardingScanner? _boarding;
 
   ArkInfo? _arkInfo;
@@ -372,7 +372,7 @@ class MpcService extends ChangeNotifier {
       }
     }
 
-    final enrolment = await gate.enrol(_passkey!, displayName: 'Merlin');
+    final enrolment = await gate.enrol(_passkey!, displayName: 'vtxos');
     await _identityBox!.put('passkeyCredentialId', enrolment.credentialId);
     await _identityBox!.put('tenantId', enrolment.tenantId);
     // The DKG that follows is its first use, and waits for it to become findable — see

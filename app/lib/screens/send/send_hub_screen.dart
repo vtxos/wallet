@@ -1,4 +1,4 @@
-import 'package:app_core/platform/platform_client.dart' show Corridor, Rail;
+import 'package:core/platform/platform_client.dart' show Corridor, Rail;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';

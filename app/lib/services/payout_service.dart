@@ -1,7 +1,7 @@
 /// Sending money to a bank account or a mobile-money wallet, through the payout platform, paid for
 /// out of an escrow.
 ///
-/// The steps are app-core's `BankSend`. This keeps what the app has to remember between them —
+/// The steps are core's `BankSend`. This keeps what the app has to remember between them —
 /// each payout, with the key of the escrow it is paid from — in the `payouts` box, and follows the
 /// payouts in flight, again after a restart. Following asks the platform, never the cosigner, so it
 /// costs no approval.
@@ -11,12 +11,12 @@ import 'dart:async';
 import 'dart:io' show SocketException;
 import 'dart:math' show pow;
 
-import 'package:app_core/asp/ark_info.dart' show IndexerVtxo;
-import 'package:app_core/client.dart';
-import 'package:app_core/passkey/operation_secrets.dart' show OperationCancelled;
-import 'package:app_core/platform/bank_send.dart';
-import 'package:app_core/platform/platform_client.dart';
-import 'package:app_core/platform/policy_check.dart';
+import 'package:core/asp/ark_info.dart' show IndexerVtxo;
+import 'package:core/client.dart';
+import 'package:core/passkey/operation_secrets.dart' show OperationCancelled;
+import 'package:core/platform/bank_send.dart';
+import 'package:core/platform/platform_client.dart';
+import 'package:core/platform/policy_check.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart' as services show PlatformException;
 import 'package:grpc/grpc.dart' show GrpcError;

@@ -32,7 +32,7 @@ class WelcomeScreen extends StatelessWidget {
               ),
               const SizedBox(height: 32),
               Text(
-                'Merlin Wallet',
+                'vtxos',
                 style: GoogleFonts.inter(
                   fontSize: 32,
                   fontWeight: FontWeight.bold,

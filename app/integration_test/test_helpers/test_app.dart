@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import 'package:app/main.dart' show MerlinWalletApp;
+import 'package:app/main.dart' show VtxosApp;
 import 'package:app/services/mpc_service.dart';
 
 Widget buildTestApp() {
@@ -13,6 +13,6 @@ Widget buildTestApp() {
         return svc;
       }),
     ],
-    child: const MerlinWalletApp(),
+    child: const VtxosApp(),
   );
 }

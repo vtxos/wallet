@@ -14,14 +14,14 @@ library;
 
 import 'dart:io';
 
-import 'package:app_core/asp/history.dart';
-import 'package:app_core/client.dart';
-import 'package:app_core/enclave/attestation.dart';
-import 'package:app_core/enclave/authenticator.dart';
-import 'package:app_core/enclave/dev_enclave.dart';
-import 'package:app_core/enclave/endpoint.dart';
-import 'package:app_core/enclave/gate.dart';
-import 'package:app_core/enclave/manifest.dart';
+import 'package:core/asp/history.dart';
+import 'package:core/client.dart';
+import 'package:core/enclave/attestation.dart';
+import 'package:core/enclave/authenticator.dart';
+import 'package:core/enclave/dev_enclave.dart';
+import 'package:core/enclave/endpoint.dart';
+import 'package:core/enclave/gate.dart';
+import 'package:core/enclave/manifest.dart';
 import 'package:e2e/boarding_poll.dart';
 import 'package:e2e/mutinynet_funder.dart';
 import 'package:hive/hive.dart';

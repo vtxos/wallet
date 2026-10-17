@@ -19,8 +19,8 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
-import 'package:app_core/asp/exit_chain.dart';
-import 'package:app_core/sessions/exit_plan.dart' show ExitTx;
+import 'package:core/asp/exit_chain.dart';
+import 'package:core/sessions/exit_plan.dart' show ExitTx;
 import 'package:app/services/mpc_service.dart';
 import 'package:app/widgets/app_bottom_nav.dart';
 

@@ -1,8 +1,0 @@
-# Vendored dependencies — committed so the EIF (and any) build needs zero
-# crates.io access and survives upstream crates being yanked/removed.
-# Regenerate after dependency changes with:  cargo vendor vendor
-[source.crates-io]
-replace-with = "vendored-sources"
-
-[source.vendored-sources]
-directory = "vendor"

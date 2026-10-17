@@ -1,10 +1,10 @@
-# Merlin Wallet
+# vtxos wallet
 
 **A passkey-based Bitcoin wallet with a Wasm cosigner: approve on your phone, verify the service you are trusting, and let previously authorized work continue while you are offline.**
 
-Merlin holds Bitcoin as **Ark off-chain VTXOs**. Ordinary wallet signing uses a **2-of-2 FROST key** shared between the phone and a remote cosigner. The phone reconstructs its signing share for each operation from its passkey and the cosigner's stored contribution, rather than keeping a FROST share in the application's persistent state.
+vtxos holds Bitcoin as **Ark off-chain VTXOs**. Ordinary wallet signing uses a **2-of-2 FROST key** shared between the phone and a remote cosigner. The phone reconstructs its signing share for each operation from its passkey and the cosigner's stored contribution, rather than keeping a FROST share in the application's persistent state.
 
-The cosigner is a Rust component running on [**enclave-runtime**](https://github.com/BitspendPayment/enclave-runtime). The runtime supplies attested HTTPS, passkey authorization, tenant-scoped encrypted storage, background scheduling, maintained connections, and device wake notifications. Merlin supplies the wallet protocol, signing rules, Ark integration, and application policy.
+The [cosigner](https://github.com/vtxos/cosigner) is a Rust component running on [**the runtime**](https://github.com/vtxos/runtime). The runtime supplies attested HTTPS, passkey authorization, tenant-scoped encrypted storage, background scheduling, maintained connections, and device wake notifications. The wallet and its cosigner supply the wallet protocol, signing rules, Ark integration, and application policy.
 
 That division supports more than interactive payments. A user can sign a bounded renewal delegate while present, then let the cosigner execute it with an Ark Service Provider (ASP) later. An explicitly paired escrow service can also initiate a policy-checked exchange through a connection the runtime maintains.
 
@@ -12,9 +12,9 @@ That division supports more than interactive payments. A user can sign a bounded
 
 ## Contents
 
-- [What Merlin implements](#what-merlin-implements)
+- [What the wallet implements](#what-the-wallet-implements)
 - [Architecture](#architecture)
-- [How Merlin uses enclave-runtime](#how-merlin-uses-enclave-runtime)
+- [How the wallet uses the runtime](#how-the-wallet-uses-the-runtime)
 - [A concrete demonstration: renew while the phone is offline](#a-concrete-demonstration-renew-while-the-phone-is-offline)
 - [Attestation, authorization, and isolation](#attestation-authorization-and-isolation)
 - [Build and run](#build-and-run)
@@ -25,7 +25,7 @@ That division supports more than interactive payments. A user can sign a bounded
 - [Trust assumptions & failure modes](#trust-assumptions--failure-modes)
 - [Emergency exit](#emergency-exit)
 
-## What Merlin implements
+## What the wallet implements
 
 | Capability | What is in the repository |
 |---|---|
@@ -36,7 +36,7 @@ That division supports more than interactive payments. A user can sign a bounded
 | **Policy-controlled escrows** | Escrow creation, service pairing, release checks, allowance/reference tracking, and replies over runtime-held service connections. |
 | **Pre-signed exits** | Exit transaction construction and verification, coverage tracking, export, and ancestry display. The app does not yet broadcast the complete ancestor/exit chain. |
 | **An attested native client** | Nonce-bound verification of runtime/guest measurements and the connection certificate before an approved gRPC interaction is sent. |
-| **Development and integration tooling** | Android app, shared Dart core, regtest CLI, Rust/FFI tests, QEMU end-to-end tests, and a MutinyNet deployment runbook. |
+| **Development and integration tooling** | Android app, shared Dart core, regtest CLI, Rust/FFI tests, and QEMU end-to-end tests. |
 
 These are implementation capabilities, not a claim that every environment is validated or every finding is closed. The [security findings](SECURITY_FINDINGS.md) track known concerns, including cross-device PRF behavior, secret lifetimes, and test coverage. Some older assessments still refer to components that have since been replaced; current source and the test entry points below describe the active architecture.
 
@@ -45,7 +45,7 @@ These are implementation capabilities, not a claim that every environment is val
 ```mermaid
 flowchart TB
     subgraph Phone[Android phone]
-        App[Flutter wallet and Dart app-core]
+        App[Flutter wallet and Dart core]
         Passkey[Platform passkey and PRF]
         FFI[Rust threshold, Ark, and attestation FFI]
         Passkey --> App
@@ -76,28 +76,28 @@ flowchart TB
 | **ASP** | Ark rounds, indexing, settlement, and the external service needed for normal Ark operations. |
 | **Paired service** | An explicitly configured counterparty for an escrow, subject to that escrow's policy. It does not receive the user's passkey or general wallet authority. |
 
-The current server artifact is [`cosigner.wasm`](cosigner/src/main.rs), built for `wasm32-wasip2`. It exports `wasi:http/incoming-handler`, `run-task`, and `on-message`. It has no listener, TLS server, or native per-user actor registry. The host library build exists for tests and development tools; running it as a standalone server is not the serving path.
+The current server artifact is [`cosigner.wasm`](https://github.com/vtxos/cosigner/blob/main/cosigner/src/main.rs), built for `wasm32-wasip2`. It exports `wasi:http/incoming-handler`, `run-task`, and `on-message`. It has no listener, TLS server, or native per-user actor registry. The host library build exists for tests and development tools; running it as a standalone server is not the serving path.
 
-## How Merlin uses enclave-runtime
+## How the wallet uses the runtime
 
-Merlin is a concrete consumer of the runtime's capabilities. Its [`Host` trait](cosigner/src/host.rs) is implemented by the [WIT adapter](cosigner/src/main.rs), and its [component world](cosigner/wit/cosigner.wit) composes the tasks, notification, and stream interfaces.
+The wallet is a concrete consumer of the runtime's capabilities. The cosigner's [`Host` trait](https://github.com/vtxos/cosigner/blob/main/cosigner/src/host.rs) is implemented by the [WIT adapter](https://github.com/vtxos/cosigner/blob/main/cosigner/src/main.rs), and its [component world](https://github.com/vtxos/cosigner/blob/main/cosigner/wit/cosigner.wit) composes the tasks, notification, and stream interfaces.
 
-| Wallet need | Runtime capability | Merlin integration |
+| Wallet need | Runtime capability | Where the wallet uses it |
 |---|---|---|
-| Identify the service before sending an approval | Attestation on `/auth/*`, PCR0/PCR16, and certificate binding | [`attestation.dart`](app-core/lib/enclave/attestation.dart), [`gate.dart`](app-core/lib/enclave/gate.dart) |
-| Carry multiple signing rounds under one approved interaction | Passkey-minted interaction token, HTTP/2, bidirectional request/response bodies | [`connection.dart`](app-core/lib/cosigner/connection.dart), [`session.rs`](cosigner/src/session.rs), [`grpc/`](cosigner/src/grpc/) |
-| Keep each wallet's files and execution separate | Tenant-scoped preopen and per-tenant execution lock | [`open_cosigner`](cosigner/src/main.rs), [`store.rs`](cosigner/src/store.rs) |
-| Preserve state beyond an invocation or restart | Copy-on-write encrypted filesystem and durable sync/rename operations | [`SnapshotState`](cosigner/src/types.rs), [`cosigner.rs`](cosigner/src/cosigner.rs) |
-| Execute an already authorized renewal later | `enclave:tasks/queue` and the `run-task` callback | [`renew.rs`](cosigner/src/renew.rs), [`cosigner.rs`](cosigner/src/cosigner.rs) |
-| Reach the ASP during unattended work | The ASP named in the cosigner's measured settings; the runtime admits only public addresses (and the emulator's host) | [`asp/`](cosigner/src/asp/), [`up-enclave.sh`](scripts/up-enclave.sh) |
-| Let a paired service initiate an exchange | `enclave:streams/connection` and `on-message` | [`escrow.rs`](cosigner/src/escrow.rs) |
-| Notify the owner without putting private details in a push | Runtime-owned device enrollment and a wake queue sent through AWS End User Messaging Push | [`host.rs`](cosigner/src/host.rs), [`cosigner.rs`](cosigner/src/cosigner.rs) |
+| Identify the service before sending an approval | Attestation on `/auth/*`, PCR0/PCR16, and certificate binding | [`attestation.dart`](core/lib/enclave/attestation.dart), [`gate.dart`](core/lib/enclave/gate.dart) |
+| Carry multiple signing rounds under one approved interaction | Passkey-minted interaction token, HTTP/2, bidirectional request/response bodies | [`connection.dart`](core/lib/cosigner/connection.dart), [`session.rs`](https://github.com/vtxos/cosigner/blob/main/cosigner/src/session.rs), [`grpc/`](https://github.com/vtxos/cosigner/blob/main/cosigner/src/grpc/) |
+| Keep each wallet's files and execution separate | Tenant-scoped preopen and per-tenant execution lock | [`open_cosigner`](https://github.com/vtxos/cosigner/blob/main/cosigner/src/main.rs), [`store.rs`](https://github.com/vtxos/cosigner/blob/main/cosigner/src/store.rs) |
+| Preserve state beyond an invocation or restart | Copy-on-write encrypted filesystem and durable sync/rename operations | [`SnapshotState`](https://github.com/vtxos/cosigner/blob/main/cosigner/src/types.rs), [`cosigner.rs`](https://github.com/vtxos/cosigner/blob/main/cosigner/src/cosigner.rs) |
+| Execute an already authorized renewal later | `enclave:tasks/queue` and the `run-task` callback | [`renew.rs`](https://github.com/vtxos/cosigner/blob/main/cosigner/src/renew.rs), [`cosigner.rs`](https://github.com/vtxos/cosigner/blob/main/cosigner/src/cosigner.rs) |
+| Reach the ASP during unattended work | The ASP named in the cosigner's measured settings; the runtime admits only public addresses (and the emulator's host) | [`asp/`](https://github.com/vtxos/cosigner/blob/main/cosigner/src/asp/), [`up-enclave.sh`](scripts/up-enclave.sh) |
+| Let a paired service initiate an exchange | `enclave:streams/connection` and `on-message` | [`escrow.rs`](https://github.com/vtxos/cosigner/blob/main/cosigner/src/escrow.rs) |
+| Notify the owner without putting private details in a push | Runtime-owned device enrollment and a wake queue sent through AWS End User Messaging Push | [`host.rs`](https://github.com/vtxos/cosigner/blob/main/cosigner/src/host.rs), [`cosigner.rs`](https://github.com/vtxos/cosigner/blob/main/cosigner/src/cosigner.rs) |
 
 ### Persistent wallet state
 
 The guest's store is a small **key-value layer over files**, not an embedded SQLite database. A value is stored at `<root>/<hex-tree>/<hex-key>`; writes use a temporary file and rename. Hex-encoded names prevent a caller-controlled key from becoming a filesystem path.
 
-Those are ordinary files from the guest's perspective. Under enclave-runtime, they live inside the wallet's tenant scope and are backed by encrypted S3 slabs and signed filesystem roots. Snapshot serialization is Merlin's responsibility; storage encryption, publication, and recovery are the runtime's. A native test using the same file store does not acquire enclave storage encryption automatically.
+Those are ordinary files from the guest's perspective. Under enclave-runtime, they live inside the wallet's tenant scope and are backed by encrypted S3 slabs and signed filesystem roots. Snapshot serialization is the cosigner's responsibility; storage encryption, publication, and recovery are the runtime's. A native test using the same file store does not acquire enclave storage encryption automatically.
 
 The runtime mounts one shared filesystem and gives each tenant a restricted view. It serializes that tenant's HTTP invocations, background work, and message callbacks. Healthy HTTP instances may be reused for the same tenant; callbacks and restarts can rebuild them. Durable wallet state belongs in the store, not in assumptions about an instance staying alive.
 
@@ -107,7 +107,7 @@ The service connection solves a separate problem from a timer. An escrow counter
 
 The guest checks that the sending service is paired to the named escrow and evaluates the stored session, transaction policy, remaining allowance, and required evidence. It tracks request IDs and consumed payment references in persistent state. Runtime reconnection does not itself provide exactly-once payments; the application-level accounting is essential.
 
-Service destinations are configured in the measured image. The guest selects a service identity from that configuration; the wallet does not gain arbitrary outbound access by supplying a URL. See [`escrow.rs`](cosigner/src/escrow.rs) and the [service-stream tests](cosigner/tests/service_stream_test.rs).
+Service destinations are configured in the measured image. The guest selects a service identity from that configuration; the wallet does not gain arbitrary outbound access by supplying a URL. See [`escrow.rs`](https://github.com/vtxos/cosigner/blob/main/cosigner/src/escrow.rs) and the [service-stream tests](https://github.com/vtxos/cosigner/blob/main/cosigner/tests/service_stream_test.rs).
 
 ## A concrete demonstration: renew while the phone is offline
 
@@ -136,7 +136,7 @@ The client checks three identities together:
 - **PCR16:** the cosigner component, with the settings written into it at deployment, measured by that runtime before key release.
 - **TLS leaf certificate:** the certificate of the connection that delivered the attested authentication response.
 
-Each authentication request carries a fresh nonce. The client verifies the document's signature/chain, pinned root, expected measurements, nonce, timestamp, and connection binding through [`crates/enclave-client`](crates/enclave-client/) and FFI. [`PinnedTransportConnector`](app-core/lib/enclave/pinned_transport.dart) then checks the certificate before handing a socket to the gRPC transport.
+Each authentication request carries a fresh nonce. The client verifies the document's signature/chain, pinned root, expected measurements, nonce, timestamp, and connection binding through [`crates/enclave-client`](https://github.com/vtxos/cosigner/blob/main/crates/enclave-client/) and FFI. [`PinnedTransportConnector`](core/lib/enclave/pinned_transport.dart) then checks the certificate before handing a socket to the gRPC transport.
 
 Attestation is carried on the runtime's `/auth/*` responses. Guest gRPC responses do not carry a separate response-signing key or an application-body signature from the runtime. Their transport is tied to the certificate already attested. Attestation identifies approved code and its connection; application checks still determine what it may sign.
 
@@ -147,7 +147,7 @@ request options → verify enclave → user-verified passkey assertion
                 → single-use interaction token → approved gRPC stream
 ```
 
-The runtime token binds the method, path, and query. It does not by itself approve every payload byte or every signing round. Merlin's protocol must validate the transaction, policy, and cryptographic contributions inside the stream. A service-initiated escrow release uses the standing policy and paired service identity rather than manufacturing a fresh phone approval.
+The runtime token binds the method, path, and query. It does not by itself approve every payload byte or every signing round. The wallet protocol must validate the transaction, policy, and cryptographic contributions inside the stream. A service-initiated escrow release uses the standing policy and paired service identity rather than manufacturing a fresh phone approval.
 
 The passkey has two distinct roles: authenticating an interaction to the runtime and deriving the phone's contribution through the PRF. Their combination is the basis of the [no-key-at-rest flow](#no-key-at-rest).
 
@@ -163,35 +163,30 @@ The QEMU environment generates its own attestation signing chain and uses a deve
 
 The complete development stack targets **Linux with KVM and vsock**. Install:
 
-- Rust and native C/C++ build tools; `wasm32-wasip2` for the cosigner.
+- Rust and native C/C++ build tools, for the FFI.
 - Dart for the client/CLI/tests and Flutter for the app. The app requires Dart `>=3.4.0 <4.0.0`; package manifests define the other SDK bounds.
-- Docker with Compose, `protoc` and `pkg-config`. Nix with flakes only to build the enclave image from a runtime checkout; the e2e boots a prebuilt bundle instead.
+- Docker with Compose, `protoc` and `pkg-config`. Nix with flakes only to build the enclave image from a runtime checkout (`make up`); the e2e runs a prebuilt image instead.
 - `python3`, `jq`, `curl`, `openssl`, and standard Linux shell utilities.
-- wasi-sdk for the guest's `secp256k1-sys` C dependency.
 - For Android: the Android SDK/ADB and NDK. The Makefile defaults to NDK `27.0.12077973`; override its build variables to match an intentional toolchain change.
 
-The enclave the e2e boots comes from [enclave-runtime](https://github.com/BitspendPayment/enclave-runtime), as a prebuilt bundle or from a checkout. The bundle is enough for `make e2e-enclave`: it carries the image, the host binaries, the harness, the WIT and the QEMU and MinIO container images, so the host needs Docker, KVM, vsock and `python3`, and none of Nix, cargo or git for the runtime. From the MerlinWallet root:
+The cosigner is [vtxos/cosigner](https://github.com/vtxos/cosigner), which builds and releases `cosigner.wasm`; its crates (`threshold`, `ark`, `enclave-client`) are `ffi/`'s git dependencies at the release tag `ffi/Cargo.toml` names, and `make proto` takes the protos from that same checkout, so `ffi/Cargo.lock` pins both. The enclave the e2e boots is the **dev enclave image** pinned in [`docker-compose.enclave.yml`](docker-compose.enclave.yml): [the runtime](https://github.com/vtxos/runtime)'s QEMU enclave and that cosigner release in one container, built by infra. The host needs Docker, KVM and vsock, and none of Nix, cargo, wasi-sdk or a runtime checkout. From the repository root:
 
 ```bash
-git submodule update --init --recursive
-rustup target add wasm32-wasip2
 sudo modprobe vsock_loopback
 
-make enclave-bundle   # the release pinned in enclave-bundle.lock, verified, unpacked into .enclave/
-make wasi-sdk         # wasi-sdk under ~/wasi-sdk unless WASI_SDK is set
+make enclave-image    # pull the pinned image; refused unless it serves the release ffi/ builds against
 ```
 
-With `.enclave/` in place it is the default `ENCLAVE_RUNTIME`. A checkout beside this repository (`~/enclave-runtime`, or `ENCLAVE_RUNTIME` set explicitly) is the fallback, and what `make up-enclave` and runtime-side work still need, since that image is built with the app's rp id and origins:
+`make up-enclave` and runtime-side work still need a checkout (`~/enclave-runtime`, or `ENCLAVE_CHECKOUT`), since that image is built with the app's rp id and origins; it serves the image's cosigner (`make cosigner`), or `COSIGNER_WASM`, a build of your own:
 
 ```bash
-export ENCLAVE_RUNTIME="$HOME/enclave-runtime"
-"$ENCLAVE_RUNTIME/scripts/wasi-sdk.sh"
-docker build -t s3fs-qemu-nitro:latest "$ENCLAVE_RUNTIME/deploy/qemu-nitro"
+export ENCLAVE_CHECKOUT="$HOME/enclave-runtime"
+docker build -t enclave-qemu-nitro:latest "$ENCLAVE_CHECKOUT/deploy/qemu-nitro"
 cargo install vhost-device-vsock --version 0.3.0 --locked \
-  --root "$ENCLAVE_RUNTIME/target/qemu-nitro/tools"
+  --root "$ENCLAVE_CHECKOUT/target/qemu-nitro/tools"
 ```
 
-The runtime's [development guide](https://github.com/BitspendPayment/enclave-runtime/blob/merkle-block-store/docs/DEV_ENCLAVE.md) describes the emulator prerequisites and network setup. The first image build can take much longer than a warm restart.
+The runtime's [development guide](https://github.com/vtxos/runtime/blob/main/docs/DEV_ENCLAVE.md) describes the emulator prerequisites and network setup. The first image build can take much longer than a warm restart.
 
 ### Start a persistent regtest environment
 
@@ -199,9 +194,9 @@ The runtime's [development guide](https://github.com/BitspendPayment/enclave-run
 make up
 ```
 
-`make up` aliases `up-enclave`. It builds `cosigner.wasm` and the host FFI, starts Bitcoin/Electrs and arkd, initializes the regtest chain and ASP, then runs the enclave in the foreground. The script mines regtest blocks while running and gives the cosigner its settings — the ASP and a development renewal margin — at boot.
+`make up` aliases `up-enclave`. It takes the released `cosigner.wasm` out of the dev enclave image, builds the host FFI, starts Bitcoin/Electrs and arkd, initializes the regtest chain and ASP, then runs the enclave in the foreground. The script mines regtest blocks while running and gives the cosigner its settings — the ASP and a development renewal margin — at boot.
 
-The default enclave name is `merlin`, the host TLS port is `8443`, and the store is retained across starts. Artifacts and pins live under `$ENCLAVE_RUNTIME/target/qemu-nitro/merlin`. The image includes the configured Android relying-party/origin settings; a custom app signing key requires the corresponding origin and domain association.
+The default enclave name is `vtxos`, the host TLS port is `8443`, and the store is retained across starts. Artifacts and pins live under `$ENCLAVE_CHECKOUT/target/qemu-nitro/vtxos`. The image includes the configured Android relying-party/origin settings; a custom app signing key requires the corresponding origin and domain association.
 
 Stopping and restarting reloads the component and preserves the retained store. A changed component changes PCR16; the emulator trust root changes every boot. Rebuild/restart clients with the new development pins. `FRESH=1 make up` intentionally discards the retained enclave store and should only be used when a clean test state is wanted.
 
@@ -242,72 +237,59 @@ make flutter
 
 Stop the foreground `make up` with Ctrl-C, or use `make down-enclave` from another terminal. `make down` also stops the Compose services **and removes their volumes**, including the regtest/ASP state. Retaining enclave wallet files alone does not preserve a regtest chain that was deleted separately.
 
-### Build the component without booting
+### The cosigner
 
-```bash
-make cosigner-wasm
-# cosigner/target/wasm32-wasip2/release/cosigner.wasm
-```
-
-This checks the vendored WIT interfaces against the runtime before compiling. There is no native cosigner server to launch; the old `runtime-run` target explicitly refuses that path.
+Built, tested and released in [vtxos/cosigner](https://github.com/vtxos/cosigner). `make cosigner` writes the release this repository pins to `.cosigner/cosigner.wasm`; to run a change of your own before it is released, set `COSIGNER_WASM` to its build for `make up` or `make e2e`.
 
 ### MutinyNet development deployment
 
-The [MutinyNet runbook](infrastructure/mutinynet-qemu/README.md) describes a QEMU enclave on EC2, public-domain ACME, the external ASP, retained MinIO storage, real wakes through AWS End User Messaging Push, and republished client pins. After completing its prerequisites and infrastructure setup, from the repository root:
+The MutinyNet deployment is [vtxos/infra](https://github.com/vtxos/infra)'s: the released cosigner in a Nitro enclave, and its runbook. Against it, from the repository root:
 
 ```bash
-make mutinynet-deploy
 make mutinynet-smoke
 ```
 
-The smoke command checks attestation, separate wallets, and DKG; its funded path uses the explicitly configured test-network funder. Deployment uploads artifacts and changes remote services, so follow the runbook before invoking it. This is a test-network deployment. Real Nitro/KMS deployment is a separate integration and validation step, not a property conferred by running QEMU on EC2.
+The smoke command checks attestation, separate wallets, and DKG; its funded path uses the explicitly configured test-network funder. This is a test network.
 
 ## Testing
 
 | Command | Purpose |
 |---|---|
-| `make threshold-test` | Rust threshold-cryptography tests. |
 | `make ffi-test` | Tests for the merged native FFI library. |
-| `make cosigner-check` | WIT drift check, host library build, and cosigner tests; needs the runtime checkout. |
-| `cargo test --manifest-path cosigner/Cargo.toml` | Cosigner host tests without the Makefile's cross-repository WIT check. |
-| `make ffi-build` then `(cd app-core && dart pub get && dart test)` | Shared client tests, including share reconstruction, operation lifetimes, attestation, and persistence. |
+| `make ffi-build` then `(cd core && dart pub get && dart test)` | Shared client tests, including share reconstruction, operation lifetimes, attestation, and persistence. |
 | `(cd app && flutter test)` | Flutter tests after package setup. |
-| `make e2e` | Builds the cosigner and FFI, starts regtest/arkd, boots the enclave (from the bundle in `.enclave/` if fetched, else the checkout) and runs `e2e/test/enclave_ark_test.dart`. |
-| `make wit-drift` | Confirms the copied runtime capability contracts match the canonical WIT. |
+| `make e2e` | Builds the FFI, starts regtest/arkd, starts the dev enclave image and runs `e2e/test/enclave_ark_test.dart`. |
 | `make proto-check` | Verifies checked-in Dart stubs match the protobuf sources; requires `protoc` and the Dart plugin. |
-| `make crypto-bench` | The repository's cryptography benchmark entry point. |
 
 The end-to-end suite covers measured-guest and certificate refusals, DKG, distinct tenants, boarding/settlement/sends, delegated renewal, contribution isolation, reconstructed shares, exits, and service pairing. These tests exist in the source; this README does not imply a fresh successful run of every suite.
 
 For a complete E2E run, let the harness configure its own enclave. An existing one can be selected with:
 
 ```bash
-make e2e-enclave ENCLAVE_RUN="$ENCLAVE_RUNTIME/target/qemu-nitro/merlin"
+make e2e-enclave ENCLAVE_RUN="$ENCLAVE_CHECKOUT/target/qemu-nitro/vtxos"
 ```
 
-An attached enclave's cosigner must also name the suite's escrow-service fixture and use a renewal margin suitable for the test timeout. The delegate test reports a skip if the deadline is too far away. A bundle carries nothing of this suite's: the harness gives the cosigner the settings in `e2e/lib/e2e_profile.dart` when it boots one (`--guest-env`), written into the component and measured into PCR16 with it. Only one emulator stack can own the fixed MinIO port/vsock configuration at a time.
+An attached enclave's cosigner must also name the suite's escrow-service fixture and use a renewal margin suitable for the test timeout. The delegate test reports a skip if the deadline is too far away. The image carries nothing of this suite's: the harness gives the cosigner the settings in `e2e/lib/e2e_profile.dart` when it starts it (`GUEST_ENV`), written into the component and measured into PCR16 with it. Only one emulator stack can own the fixed MinIO port/vsock configuration at a time.
 
-CI (`.github/workflows/ci.yml`) runs the cosigner's, threshold's and FFI's `cargo test`, every Dart package's analysis, `app-core`'s tests against the built FFI, the app's `flutter analyze` and `flutter test`, and the enclave e2e: the `enclave-e2e` job fetches the bundle pinned in `enclave-bundle.lock`, boots it on the runner's KVM (hosted runners have nested virtualisation; the runtime's own CI relies on the same) and runs the suite. Moving to a newer runtime is: dispatch the runtime's "Publish a dev enclave" workflow, with no image options, then put the release name and the sha256 from its `.sha256` asset into `enclave-bundle.lock`. A change to a ceremony is still run locally before it is called done. Host tests, QEMU integration tests, Android device tests, and real Nitro validation establish different properties.
+CI (`.github/workflows/ci.yml`) runs the FFI's `cargo test`, every Dart package's analysis, `core`'s tests against the built FFI, the app's `flutter analyze` and `flutter test`, and the enclave e2e: the `enclave-e2e` job starts the dev enclave image on the runner's KVM (hosted runners have nested virtualisation; the runtime's own CI relies on the same) and runs the suite. Moving to a newer runtime or cosigner is infra's: it builds the image from its pins and prints the digest, which goes into `docker-compose.enclave.yml`, with the tags in `ffi/Cargo.toml` moved to the same cosigner release. A change to a ceremony is still run locally before it is called done. Host tests, QEMU integration tests, Android device tests, and real Nitro validation establish different properties.
 
 ## Repository guide
 
 | Path | Responsibility |
 |---|---|
 | [`app/`](app/) | Flutter Android UI, passkey platform integration, onboarding, payments, and exit display. |
-| [`app-core/`](app-core/) | Dart protocol orchestration, attested transport, passkey derivation, persistence, and Ark client operations. |
-| [`cosigner/`](cosigner/) | Rust Wasm component: gRPC handlers, signing, file-backed state, delegates, escrows, policy, and host capability bindings. |
-| [`crates/threshold/`](crates/threshold/) | FROST/DKG and supporting secp256k1 operations used by the guest and native FFI. |
-| [`crates/ark/`](crates/ark/) | Ark transaction/protocol primitives, delegate and exit construction, and contract VTXOs. |
-| [`crates/enclave-client/`](crates/enclave-client/) | Rust attestation verification used by the client through FFI. |
+| [`core/`](core/) | Dart protocol orchestration, attested transport, passkey derivation, persistence, and Ark client operations. |
+| [`cosigner/`](https://github.com/vtxos/cosigner/blob/main/cosigner/) | Rust Wasm component: gRPC handlers, signing, file-backed state, delegates, escrows, policy, and host capability bindings. |
+| [`crates/threshold/`](https://github.com/vtxos/cosigner/blob/main/crates/threshold/) | FROST/DKG and supporting secp256k1 operations used by the guest and native FFI. |
+| [`crates/ark/`](https://github.com/vtxos/cosigner/blob/main/crates/ark/) | Ark transaction/protocol primitives, delegate and exit construction, and contract VTXOs. |
+| [`crates/enclave-client/`](https://github.com/vtxos/cosigner/blob/main/crates/enclave-client/) | Rust attestation verification used by the client through FFI. |
 | [`ffi/`](ffi/) | The merged C ABI for threshold, Ark, and enclave functionality. |
 | [`protocol/`](protocol/) | Protobuf contracts and generated Dart messages/stubs. |
-| [`cli/`](cli/) | Regtest wallet REPL using software passkeys and the same client core. |
+| [`cli/`](cli/) | Regtest wallet REPL using software passkeys and the same client core; `bin/bob.dart` is Bob, the integration test's counterparty (`make bob-up`). |
 | [`e2e/`](e2e/) | QEMU harness, regtest integration scenarios, and test escrow service. |
-| [`infrastructure/mutinynet-qemu/`](infrastructure/mutinynet-qemu/) | Current emulated-enclave deployment and runbook. |
-| [`scripts/`](scripts/) | Component builds, interface checks, local stack startup, and development helpers. |
-| [`third_party/rust-sdk/`](third_party/rust-sdk/) | Ark SDK submodule and its own upstream license. |
+| [`scripts/`](scripts/) | Local stack startup, regtest and ASP setup, and development helpers. |
 
-The runtime is maintained in its [separate repository](https://github.com/BitspendPayment/enclave-runtime). It owns the measured host and storage machinery; Merlin owns the application component and wallet clients.
+The runtime is maintained in its [separate repository](https://github.com/vtxos/runtime). It owns the measured host and storage machinery; [vtxos/cosigner](https://github.com/vtxos/cosigner) owns the application component, and this repository the wallet clients.
 
 ## Security model summary
 
@@ -336,7 +318,7 @@ A share is the sum of both dealers' polynomials at the wallet's identifier:
 ```
 
 `f_wallet` is derived from the passkey's PRF output by a labelled HKDF
-(`app-core/lib/passkey/key_derivation.dart`). `f_cosigner(id)` is one scalar, which the cosigner
+(`core/lib/passkey/key_derivation.dart`). `f_cosigner(id)` is one scalar, which the cosigner
 sealed at DKG. Neither is the key. An operation that signs goes like this
 (`MpcClient._withOperation`):
 
@@ -349,11 +331,11 @@ sealed at DKG. Neither is the key. An operation that signs goes like this
    that does not derive this wallet's identifier is refused here, before anything is opened.
 4. **Open the stream.** Its open names the wallet's identifier; the cosigner's first answer carries
    `wallet_dealt_share`, on `Sign`, `Send` and `Renew` alike — once per stream, and never the
-   cosigner's own share (`cosigner/src/cosigner.rs`, `dealt_share_for`). No second call, so
+   cosigner's own share ([`cosigner.rs`](https://github.com/vtxos/cosigner/blob/main/cosigner/src/cosigner.rs), `dealt_share_for`). No second call, so
    no second approval.
 5. **Add, fix the sign, check.** The sum is accepted only if `s·G` is the verifying share this
    device stored when the wallet was made — not one that arrived with the contribution
-   (`app-core/lib/passkey/share_reconstruction.dart`). The share signs every round of that stream:
+   (`core/lib/passkey/share_reconstruction.dart`). The share signs every round of that stream:
    a renewal's intent proof, its commitment, the trailing seal.
 6. **Let go**, in a `finally`: on success, on failure, and on cancellation
    (`MpcClient.cancelOperation`).
@@ -416,9 +398,9 @@ left the device nor whether those outpoints are still there — so a deal struck
 would be one the owner could empty at will. The mark is sealed before the reclaim's first nonce,
 so an abandoned reclaim is as final as a finished one; the next deal gets a new escrow.
 
-Tests: `app-core/test/share_reconstruction_test.dart`, `escrow_reconstruction_test.dart`,
+Tests: `core/test/share_reconstruction_test.dart`, `escrow_reconstruction_test.dart`,
 `operation_lifecycle_test.dart` (a cosigner in-process; reads the box file back as raw bytes),
-`cancel_streams_test.dart`, `cosigner/tests/stream_contribution_test.rs`, `seal_test.rs`, and
+`cancel_streams_test.dart`, the cosigner's [`stream_contribution_test.rs`](https://github.com/vtxos/cosigner/blob/main/cosigner/tests/stream_contribution_test.rs) and [`seal_test.rs`](https://github.com/vtxos/cosigner/blob/main/cosigner/tests/seal_test.rs), and
 the `nothing secret at rest`, `a wallet on a new phone` and `pairing a service into an escrow`
 groups of `e2e/test/enclave_ark_test.dart`.
 
@@ -430,7 +412,7 @@ you have to trust for it not to.
 ### The one that matters: the Ark owner key is 2-of-2
 
 Ordinary wallet VTXOs and boarding outputs use the **FROST group key** as their owner key
-([`MpcClient._ownerXOnly`](app-core/lib/client.dart)). Escrow contracts have their own key and
+([`MpcClient._ownerXOnly`](core/lib/client.dart)). Escrow contracts have their own key and
 policy arrangements. The stock Ark taptree used for ordinary wallet outputs has two spend paths:
 
 ```
@@ -438,8 +420,8 @@ forfeit leaf:  <asp_pk> OP_CHECKSIGVERIFY <owner_pk> OP_CHECKSIG
 exit leaf:     <delay>  OP_CSV OP_DROP    <owner_pk> OP_CHECKSIG
 ```
 
-See [`Vtxo::new_default`](cosigner/vendor/ark-core/src/vtxo.rs) and the
-[`multisig_script` / `csv_sig_script` builders](cosigner/vendor/ark-core/src/script.rs).
+See ark-core's [`Vtxo::new_default`](https://docs.rs/ark-core/0.9.1/src/ark_core/vtxo.rs.html#123) and its
+[`multisig_script`](https://docs.rs/ark-core/0.9.1/src/ark_core/script.rs.html#23) and [`csv_sig_script`](https://docs.rs/ark-core/0.9.1/src/ark_core/script.rs.html#54) builders.
 
 Both name `owner_pk`, and here it is the group key. The exit timelock controls
 when funds can be spent; it does not remove the need for a group-key signature.
@@ -462,8 +444,8 @@ it prevents new signatures and share reconstruction unless an adequate recovery/
 exists. The phone's public state does not replace the cosigner's share or dealt contribution.
 Saved exits remain useful only for the specific outputs and destination they cover.
 
-The [MutinyNet deployment](infrastructure/mutinynet-qemu/) uses an emulated enclave. Its operator
-controls the development storage key and the attestation signing chain. The client exercises its
+The dev enclave `make up` and the e2e run is emulated. Its operator controls the development
+storage key and the attestation signing chain. The client exercises its
 verification path against configured emulator pins; this does not establish confidentiality or
 independent code identity against that operator.
 
@@ -524,9 +506,9 @@ off-chain in the first place — the batch tree branch, and the checkpoint and A
 funds not yet settled — is not in the app yet; the exit is the last hop, and the one that cannot be
 obtained later.
 
-Implementation: [`exit.rs`](crates/ark/src/exit.rs) (shared transaction construction),
-[`FFI exit verification`](ffi/src/ark/exit.rs), [`renew.rs`](cosigner/src/renew.rs),
-[`exit_plan.dart`](app-core/lib/sessions/exit_plan.dart), and
+Implementation: [`exit.rs`](https://github.com/vtxos/cosigner/blob/main/crates/ark/src/exit.rs) (shared transaction construction),
+[`FFI exit verification`](ffi/src/ark/exit.rs), [`renew.rs`](https://github.com/vtxos/cosigner/blob/main/cosigner/src/renew.rs),
+[`exit_plan.dart`](core/lib/sessions/exit_plan.dart), and
 [`exit_screen.dart`](app/lib/screens/exit/exit_screen.dart).
 
 ### The better answer, still to come
@@ -542,11 +524,11 @@ recovery leaf:  <recov_delay>  OP_CSV OP_DROP    <recovery_pk> OP_CHECKSIG   # p
 ```
 
 The candidate recovery scalar is the wallet's dealer secret `a0`, derived by
-[`walletPolynomial`](app-core/lib/passkey/key_derivation.dart) from the passkey PRF. Its public
+[`walletPolynomial`](core/lib/passkey/key_derivation.dart) from the passkey PRF. Its public
 point could authorize a delayed recovery spend without reconstructing the ordinary group key.
 That would still depend on possession of a functioning passkey and stable derivation.
 
-The [contract VTXO builder](crates/ark/src/lib.rs) already demonstrates separate cooperative and
+The [contract VTXO builder](https://github.com/vtxos/cosigner/blob/main/crates/ark/src/lib.rs) already demonstrates separate cooperative and
 exit-owner keys. This is useful implementation groundwork, not proof that a new ordinary-wallet
 three-leaf design is compatible with every ASP, fee model, or recovery scenario. The recovery
 key must be explicitly threaded and validated through the wallet/cosigner data model.
@@ -568,15 +550,15 @@ exits remain the implemented mechanism while this broader path is unfinished.
 - [BIP-341: Taproot](https://github.com/bitcoin/bips/blob/master/bip-0341.mediawiki)
 - [Ark protocol](https://arkdev.info/) — off-chain VTXOs via an Ark Service Provider
 - [AWS Nitro Enclaves](https://docs.aws.amazon.com/enclaves/latest/user/nitro-enclave.html)
-- [enclave-runtime](https://github.com/BitspendPayment/enclave-runtime) — the Wasm host, encrypted filesystem, attestation, and background capabilities used by Merlin
+- [vtxos/runtime](https://github.com/vtxos/runtime) — the Wasm host, encrypted filesystem, attestation, and background capabilities the cosigner runs on
 
 ## License
 
-This repository is [MIT-licensed](LICENSE). The client, cosigner component, threshold library,
-and repository-owned deployment code can be inspected and used under those terms.
+This repository is [MIT-licensed](LICENSE). The app, the client core, the FFI and
+repository-owned deployment code can be inspected and used under those terms. The cosigner and the
+crates it shares with this repository are [vtxos/cosigner](https://github.com/vtxos/cosigner)'s.
 
 Third-party dependencies retain their own licenses. The runtime lives in its separate
-[Apache-2.0-declared workspace](https://github.com/BitspendPayment/enclave-runtime/blob/merkle-block-store/Cargo.toml).
-The [`third_party/rust-sdk`](third_party/rust-sdk/) submodule and vendored crates under
-[`cosigner/vendor`](cosigner/vendor/) retain their upstream licensing; this repository's MIT
-license does not replace it.
+[Apache-2.0-declared workspace](https://github.com/vtxos/runtime/blob/main/Cargo.toml).
+Every dependency retains its upstream licensing; this repository's MIT license does not replace
+it.

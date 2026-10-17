@@ -4,9 +4,9 @@ import 'dart:io';
 import 'package:app/screens/send/payout_form_screen.dart';
 import 'package:app/services/mpc_service.dart';
 import 'package:app/services/payout_service.dart';
-import 'package:app_core/asp/ark_info.dart' show IndexerVtxo;
-import 'package:app_core/platform/bank_send.dart';
-import 'package:app_core/platform/platform_client.dart';
+import 'package:core/asp/ark_info.dart' show IndexerVtxo;
+import 'package:core/platform/bank_send.dart';
+import 'package:core/platform/platform_client.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hive/hive.dart';
 

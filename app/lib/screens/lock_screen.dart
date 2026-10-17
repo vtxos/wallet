@@ -79,7 +79,7 @@ class _LockScreenState extends State<LockScreen> {
                 SvgPicture.asset('assets/logo/mark-a-hat.svg', width: 96, height: 96),
                 const SizedBox(height: 24),
                 Text(
-                  'Merlin Wallet',
+                  'vtxos',
                   style: GoogleFonts.inter(fontSize: 24, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 12),

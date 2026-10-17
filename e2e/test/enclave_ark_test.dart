@@ -9,9 +9,9 @@
 /// without one.
 ///
 /// ```console
-/// $ make cosigner-wasm
+/// $ make enclave-image                                   # the pinned dev enclave image
 /// $ dart test test/enclave_ark_test.dart                    # boots an enclave, ~minutes
-/// $ MERLIN_ENCLAVE_RUN=~/enclave-runtime/target/qemu-nitro/merlin dart test …   # attaches
+/// $ VTXOS_ENCLAVE_RUN=~/enclave-runtime/target/qemu-nitro/vtxos dart test …   # attaches
 /// ```
 library;
 
@@ -20,23 +20,23 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:app_core/ark/ark.dart' as ark;
-import 'package:app_core/asp/asp_client.dart' show IndexerVtxo;
-import 'package:app_core/asp/exit_chain.dart' show ChainKind;
+import 'package:core/ark/ark.dart' as ark;
+import 'package:core/asp/asp_client.dart' show IndexerVtxo;
+import 'package:core/asp/exit_chain.dart' show ChainKind;
 import 'package:blockchain_utils/blockchain_utils.dart' show SegwitBech32Encoder;
-import 'package:app_core/client.dart';
-import 'package:app_core/threshold_types.dart' as ark_threshold;
-import 'package:app_core/sessions/service_delivery.dart' show RewritingDelivery;
+import 'package:core/client.dart';
+import 'package:core/threshold_types.dart' as ark_threshold;
+import 'package:core/sessions/service_delivery.dart' show RewritingDelivery;
 import 'package:e2e/escrow_service.dart';
-import 'package:app_core/enclave/attestation.dart';
-import 'package:app_core/enclave/authenticator.dart';
-import 'package:app_core/enclave/gate.dart';
+import 'package:core/enclave/attestation.dart';
+import 'package:core/enclave/authenticator.dart';
+import 'package:core/enclave/gate.dart';
 import 'package:crypto/crypto.dart' as crypto;
-import 'package:app_core/passkey/key_derivation.dart' show walletPolynomial;
-import 'package:app_core/passkey/seed_source.dart';
-import 'package:app_core/passkey/share_reconstruction.dart' show WrongPasskey;
-import 'package:app_core/persistence/wallet_store.dart' show forbiddenStateKeys;
-import 'package:app_core/threshold_types.dart' as threshold;
+import 'package:core/passkey/key_derivation.dart' show walletPolynomial;
+import 'package:core/passkey/seed_source.dart';
+import 'package:core/passkey/share_reconstruction.dart' show WrongPasskey;
+import 'package:core/persistence/wallet_store.dart' show forbiddenStateKeys;
+import 'package:core/threshold_types.dart' as threshold;
 import 'package:e2e/boarding_poll.dart';
 import 'package:e2e/e2e_profile.dart';
 import 'package:e2e/enclave_harness.dart';

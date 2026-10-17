@@ -55,7 +55,7 @@ If `state.settle_session` is `Some(...)` (a session was created on a previous
 attempt) **and** the client sends a request with empty `signed_messages`, this
 arm fires, parks the session back, and replies `WaitingForBatch` immediately.
 The client's loop at
-[`app-core/lib/client.dart::settle`](app-core/lib/client.dart) treats
+[`core/lib/client.dart::settle`](core/lib/client.dart) treats
 `WAITING_FOR_BATCH` as "keep polling with empty sigs":
 
 ```dart
@@ -124,7 +124,7 @@ Two layered fixes, do both:
 - [cosigner-runtime/src/cosigner/handlers/ark_send.rs](cosigner-runtime/src/cosigner/handlers/ark_send.rs)
   — modify the `(Some, false)` arm; possibly add a `clear_settle_session`
   command for the UI escape hatch.
-- [protocol/protos/mpc_wallet.proto](protocol/protos/mpc_wallet.proto) — add
+- [protocol/protos/mpc_wallet.proto](https://github.com/vtxos/cosigner/blob/main/protocol/protos/mpc_wallet.proto) — add
   `rpc ClearBoardingSession` if implementing fix #2.
 - [app/lib/screens/ark/ark_board_screen.dart](app/lib/screens/ark/ark_board_screen.dart)
   — add a "Reset" button wired to the new RPC.
@@ -250,7 +250,7 @@ this entire file.
 **Status:** ✅ fixed.
 
 * Server: `rpc GetServerInfo` added to
-  [protocol/protos/mpc_wallet.proto](protocol/protos/mpc_wallet.proto);
+  [protocol/protos/mpc_wallet.proto](https://github.com/vtxos/cosigner/blob/main/protocol/protos/mpc_wallet.proto);
   unauthenticated handler in
   [cosigner-runtime/src/rest_api.rs](cosigner-runtime/src/rest_api.rs)
   serves `bitcoin_network` from `Config`.
@@ -303,7 +303,7 @@ fetches it once per session and passes it through to the wallet constructor.
 
 #### Step 1 — Proto
 
-Add to [protocol/protos/mpc_wallet.proto](protocol/protos/mpc_wallet.proto):
+Add to [protocol/protos/mpc_wallet.proto](https://github.com/vtxos/cosigner/blob/main/protocol/protos/mpc_wallet.proto):
 
 ```proto
 service MPCWallet {
@@ -336,7 +336,7 @@ Regenerate stubs: `make proto`.
 #### Step 3 — Dart client
 
 Add `getServerInfo()` to `MpcClient` in
-[app-core/lib/client.dart](app-core/lib/client.dart). Returns a typed
+[core/lib/client.dart](core/lib/client.dart). Returns a typed
 `ServerInfo` struct.
 
 #### Step 4 — Drop the duplicated state in MpcService

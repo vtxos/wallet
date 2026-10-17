@@ -1,0 +1,30 @@
+# The dev enclave the e2e runs against: vtxos/runtime's QEMU enclave and the released cosigner in
+# one image, built by infra (dev-enclave/ there, which this copies). The image is the pin: its
+# org.vtxos.cosigner label must be the release ffi/Cargo.toml names (`make enclave-image`).
+#
+# Started by the e2e harness (e2e/lib/enclave_harness.dart), which sets ENCLAVE_DIR to .enclave-run
+# and GUEST_ENV to the cosigner's settings. The host needs KVM, Docker and `modprobe
+# vsock_loopback`. Dev only: the Docker socket and the host network make it root on the host.
+services:
+  enclave:
+    image: ghcr.io/vtxos/dev-enclave@sha256:7c5a4344cba8268aa8508fead76c5de0597733f542e9bfca45d31d7ed93eb20e
+    # The harness's QEMU, MinIO and Pebble are containers of the host's Docker, so it gets the
+    # socket, and they bind-mount by host path, so ENCLAVE_DIR is mounted at its own path. Host
+    # networking: the enclave serves on 127.0.0.1:8443, and the cosigner reaches arkd and the
+    # suite's escrow service on this host through gvproxy at 192.168.127.254.
+    network_mode: host
+    # So `down` reaches the harness, whose exit trap stops the containers it started.
+    init: true
+    stop_grace_period: 60s
+    devices: [/dev/kvm, /dev/vsock]
+    # The parent-side services speak AF_VSOCK, a socket family Docker's default seccomp profile
+    # refuses. Unconfined costs nothing here: the Docker socket already makes this root on the host.
+    security_opt: [seccomp:unconfined]
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ${ENCLAVE_DIR:?an absolute host directory}:${ENCLAVE_DIR}
+    environment:
+      ENCLAVE_DIR: ${ENCLAVE_DIR}
+      GUEST_ENV: ${GUEST_ENV:-}
+      GUEST: ${GUEST:-}
+      ZFS_SIZE: ${ZFS_SIZE:-4G}

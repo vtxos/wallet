@@ -1,5 +1,5 @@
-import 'package:app_core/client.dart';
-import 'package:app_core/electrum.dart';
+import 'package:core/client.dart';
+import 'package:core/electrum.dart';
 import 'package:bitcoin_base/bitcoin_base.dart';
 import 'package:blockchain_utils/blockchain_utils.dart' hide hex;
 import 'package:fixnum/fixnum.dart';
